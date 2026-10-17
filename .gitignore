@@ -7,7 +7,7 @@ uploads/
 *.db-shm
 *.db-wal
 
-# ── Model weights (too large, 100 MB – 5 GB each) ───────────────────────────
+# ── Model weights (too large) ───────────────────────────────────────────────
 weights/
 *.ckpt
 *.safetensors
@@ -18,24 +18,19 @@ weights/
 # ── Secrets ─────────────────────────────────────────────────────────────────
 .env
 .env.local
-.env.*.local
 
 # ── Python cache ─────────────────────────────────────────────────────────────
 __pycache__/
-*.py[cod]
+*.pyc
 *.pyo
 .pytest_cache/
-*.egg-info/
-dist/
-build/
 
-# ── Large media / build artefacts ────────────────────────────────────────────
+# ── Large media ──────────────────────────────────────────────────────────────
 *.mp4
 *.zip
 *.tar.gz
-*.log
 
-# ── Kiro / IDE temp files ─────────────────────────────────────────────────────
+# ── Kiro / IDE ────────────────────────────────────────────────────────────────
 .kiro/
 .agents/
 .codex_build/
@@ -44,7 +39,7 @@ build/
 .vscode/
 .idea/
 
-# ── One-off build scripts (not part of the project) ──────────────────────────
+# ── Junk one-off scripts ──────────────────────────────────────────────────────
 build_poster.py
 build_final*.py
 make_chart.py
@@ -57,8 +52,9 @@ create_trigenix_project_deck.py
 patch_instantmesh.py
 check.py
 verify_fixes.py
+diag*.py
 
-# ── Poster working copies (keep only final versions in docs/) ────────────────
+# ── Poster duplicates (keep only docs/) ──────────────────────────────────────
 TriGenix_Poster_BlueTheme.pptx
 TriGenix_Poster_Final.pptx
 TriGenix_Poster_A3_Updated.pptx
@@ -68,8 +64,7 @@ TriGenix_Exhibition_Poster.pptx
 TriGenix_Poster_Final2_Updated.pptx
 TriGenix_Poster_Final2_Updated_Technical.pptx
 
-# ── Plagiarism report (not for public repo) ──────────────────────────────────
-plagiarism report/
+# ── Plagiarism report ─────────────────────────────────────────────────────────
 Plagiarism Report.*
 
 # ── Misc ─────────────────────────────────────────────────────────────────────
