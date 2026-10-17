@@ -1,145 +1,54 @@
-﻿<div align="center">
+﻿# TriGenix
 
-# TriGenix
-### Single-Image 3D Reconstruction Platform
-
-**Turn one photograph into an interactive, textured 3D model — viewable in any browser, exportable for 3D printing, AR/VR, gaming and robotics.**
-
-![Demo](docs/demo/strawberry_output.png)
-*Left to right: masked input photo → depth colour map → synthesised novel view → final mesh*
+Single-image 3D reconstruction platform. Upload one photo, get a textured, watertight 3D mesh — viewable in browser, exportable for 3D printing, AR/VR, and gaming.
 
 ---
 
-[![Private Portfolio](https://img.shields.io/badge/visibility-private%20portfolio-blueviolet)](#)
-[![Python 3.11](https://img.shields.io/badge/python-3.11-blue)](#)
-[![Status](https://img.shields.io/badge/status-academic%20project-green)](#)
-
-</div>
-
----
-
-## About This Project
-
-TriGenix was developed as a final-year academic project at **Usha Mittal Institute of Technology, S.N.D.T. Women's University** under the guidance of **Prof. Sheetal Mhatre**.
-
-**Team:**
-- Shruti Vyavahare — [vshruti066@gmail.com](mailto:vshruti066@gmail.com)
-- Sumedha Gamare — [sumedhagamare2005@gmail.com](mailto:sumedhagamare2005@gmail.com)
-
-### My Contribution
-
-I want to be transparent: this project was built using an AI-assisted development environment (Kiro IDE), which helped generate boilerplate code, suggest implementations, and speed up development. My personal contributions include:
-
-- **System architecture decisions** — choosing TripoSR as the primary reconstruction backend, designing the fallback cascade, and structuring the three-layer frontend/backend/pipeline separation
-- **Pipeline design and iteration** — defining the seven-stage processing pipeline and iterating on it through three development phases based on real output quality
-- **Colour projection algorithm design** — specifying the region-based k-means approach, per-view calibration, colour-locking strategy, and the hue-conflict rejection fix
-- **Testing and evaluation** — running 75+ reconstruction jobs, analysing results, identifying failure modes (orientation bug, side-view colour bleed), and directing the fixes
-- **Research paper** — writing the IEEE-format paper documenting methodology, results and analysis
-- **Problem diagnosis and debugging** — identifying root causes of visual artefacts and specifying targeted fixes
-- **Product decisions** — scoping the 3D-printing workflow, 9 export formats, quality scoring, and confidence mapping
-
-The codebase represents what I learned about computer vision pipelines, 3D reconstruction, and full-stack web development. I understand every component, can explain every design decision, and directed the development throughout.
-
----
-
-## What It Does
+## What it does
 
 ```
-Single photo  →  [Zero123++]  →  6 novel views
-                                      ↓
-                             [DPT-Large depth]  →  7 depth maps
-                                      ↓
-                    [TripoSR neural reconstruction]  →  raw mesh
-                                      ↓
-                     [Region-based colour projection]  →  textured mesh
-                                      ↓
-                      [Mesh repair + 9-format export]  →  GLB/STL/3MF/...
-                                      ↓
-                          [Three.js browser viewer]  →  interactive 3D
+Single photo
+    → Zero123++ synthesises 6 novel views
+    → DPT-Large estimates depth maps
+    → TripoSR reconstructs 3D mesh
+    → Region-based k-means colour projection
+    → Mesh repair + watertight validation
+    → 9-format export (GLB, STL, 3MF, AR, UV, LOD...)
+    → Three.js interactive browser viewer
 ```
-
----
-
-## Key Results
-
-| Metric | Value |
-|--------|-------|
-| Evaluated models | 70+ |
-| Watertight rate (print exports) | 100% |
-| Mean silhouette IoU | 0.452 |
-| Mean colour error | 5.7 / 255 units |
-| Processing time (GPU) | 2 – 18 min |
-| Export formats | 9 |
-| Automated tests | 82 passing |
-
-![Runtime distribution](docs/demo/runtime_chart.png)
-*Processing time across 75 real runs — colour-coded by backend (navy = TripoSR, light blue = visual hull)*
 
 ---
 
 ## Features
 
-- **Single-image → 3D mesh** via Zero123++ multi-view synthesis + TripoSR neural reconstruction
-- **Region-based colour projection** — k-means segmentation, per-view brightness calibration, hue-conflict rejection
-- **Watertight output** — PyMeshFix repair, boundary-edge validation, guaranteed for all print exports
-- **9 export formats** — GLB, STL, 3MF, AR/VR GLB, UV-textured GLB, LOD, Simulation, Collision OBJ
-- **Interactive Three.js viewer** — orbit controls, shading modes, lighting presets, screenshot
-- **Multi-user platform** — scrypt authentication, per-user history, share links
-- **Integrated 3D-printing workflow** — slicer integration, dry-run and physical print dispatch
-- **Quality scoring** — silhouette IoU, colour accuracy, mesh topology report
-- **Real-time progress** — stage-by-stage status polling, ETA, cancellation
-- **82 automated regression tests** — auth, upload, topology, mesh repair, end-to-end
+- Single-image to textured 3D mesh (no special hardware needed)
+- TripoSR neural reconstruction with visual-hull CPU fallback
+- Region-based colour projection — k-means segmentation, per-view calibration, hue-conflict rejection
+- 100% watertight print exports via PyMeshFix repair pipeline
+- 9 export formats — GLB, STL, 3MF, AR/VR GLB, UV-textured GLB, LOD, Simulation, Collision OBJ
+- Interactive Three.js viewer with orbit controls, shading modes, lighting presets
+- Multi-user authentication, per-user history, share links
+- Integrated 3D-printing workflow
+- Real-time stage-by-stage progress, ETA, cancellation
+- 82 automated regression tests
 
 ---
 
-## Tech Stack
+## Requirements
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | HTML / CSS / JavaScript, Three.js r128 |
-| Backend | Python 3.11, `ThreadingHTTPServer` (no framework) |
-| Reconstruction | TripoSR, Zero123++ (Diffusers), Intel DPT-Large (Transformers) |
-| Background removal | rembg / u2net |
-| Geometry | trimesh, PyMeshFix, scikit-image Marching Cubes |
-| ML utilities | PyTorch (CUDA), NumPy, SciPy, scikit-learn |
-| Database | SQLite |
-| Testing | pytest (82 tests) |
+- Python 3.11+
+- NVIDIA GPU, 6 GB+ VRAM, CUDA 11.8+
+- 16 GB RAM (32 GB recommended)
+- 20 GB free disk space
 
 ---
 
-## Project Structure
-
-```
-trigenix/
-  server.py                 Main HTTP server + routing
-  processor.py              Image preprocessing (rembg, Zero123++, DPT)
-  reconstructor.py          3D reconstruction, colour projection, export
-  auth.py                   Authentication, sessions, history, shares
-  printer.py                3D print job management
-  mesh_repair.py            Automatic mesh repair utilities
-  pose_estimator.py         Input photo pose analysis
-  quality_scorer.py         Six-category mesh quality scoring
-  confidence_mapper.py      Per-vertex reconstruction confidence
-  multi_angle_processor.py  4-angle capture mode
-  cleanup_worker.py         Stale job cleanup daemon
-  HTML/                     Frontend pages
-  JS/                       Frontend JavaScript
-  CSS/                      Stylesheets
-  tests/                    82 automated tests
-  paper/                    IEEE research paper (LaTeX)
-  docs/                     Demo images and poster
-  .env.example              Configuration template
-  requirements.txt          Python dependencies
-```
-
----
-
-## Setup (Local)
+## Setup
 
 ```bash
 # 1. Clone
-git clone https://github.com/YOUR_USERNAME/trigenix.git
-cd trigenix
+git clone https://github.com/VShruti245/3dModelGen.git
+cd 3dModelGen
 
 # 2. Virtual environment
 python -m venv venv
@@ -151,18 +60,16 @@ pip install -r requirements.txt
 
 # 4. Configure
 cp .env.example .env
-# Edit .env as needed
+# Edit .env if needed
 
-# 5. Download model weights
-# Zero123++, DPT-Large, rembg/u2net: auto-downloaded on first run
-# TripoSR: place checkpoint in weights/ (see weights/README.md)
+# 5. Model weights
+# Zero123++, DPT-Large, rembg — auto-downloaded on first run
+# TripoSR — place checkpoint in weights/
 
 # 6. Run
 python server.py
 # Open http://localhost:8000
 ```
-
-**Minimum hardware:** Intel Core i5, 16 GB RAM, NVIDIA GPU 6 GB VRAM (CUDA 11.8+), 20 GB disk
 
 ---
 
@@ -179,25 +86,64 @@ python -m pytest tests/ -q
 
 ---
 
-## Future Work
+## Project Structure
 
-- **Live web deployment** — host on cloud GPU (AWS/GCP) for public access
-- **InstantMesh integration** — replace TripoSR for higher fidelity and faster inference
-- **Multi-angle capture** — accept 4 user photos for better geometry accuracy
-- **WebXR/Unity export** — direct AR placement from browser
-- **Mobile app** — Android/iOS capture and viewing
+```
+server.py                 HTTP server + routing
+processor.py              Background removal, Zero123++, DPT depth
+reconstructor.py          TripoSR reconstruction, colour projection, export
+auth.py                   Authentication, sessions, history, shares
+printer.py                3D print job management
+mesh_repair.py            Automatic mesh repair
+pose_estimator.py         Input photo pose analysis
+quality_scorer.py         Mesh quality scoring
+confidence_mapper.py      Per-vertex confidence mapping
+multi_angle_processor.py  4-angle capture mode
+cleanup_worker.py         Stale job cleanup
+HTML/                     Frontend pages
+JS/                       Frontend JavaScript
+CSS/                      Stylesheets
+tests/                    82 automated tests
+requirements.txt          Python dependencies
+.env.example              Configuration template
+```
 
 ---
 
-## Research Paper
+## Tech Stack
 
-An IEEE-format research paper documenting the system, methodology and evaluation results is in `paper/trigenix_paper.tex`.
+| Layer | Technology |
+|-------|-----------|
+| Frontend | HTML / CSS / JavaScript, Three.js r128 |
+| Backend | Python 3.11, ThreadingHTTPServer |
+| Reconstruction | TripoSR, Zero123++ (Diffusers), DPT-Large (Transformers) |
+| Background removal | rembg / u2net |
+| Geometry | trimesh, PyMeshFix, scikit-image |
+| ML | PyTorch (CUDA), NumPy, SciPy, scikit-learn |
+| Database | SQLite |
+| Testing | pytest |
+
+---
+
+## Results
+
+| Metric | Value |
+|--------|-------|
+| Models evaluated | 70+ |
+| Watertight rate | 100% |
+| Mean silhouette IoU | 0.452 |
+| Mean colour error | 5.7 / 255 |
+| Processing time (GPU) | 2 – 18 min |
+| Export formats | 9 |
+| Automated tests | 82 passing |
 
 ---
 
 ## Academic Context
 
-This project was submitted as a final-year project at Usha Mittal Institute of Technology, S.N.D.T. Women's University, Data Science & Engineering Department (2025–2026). It is shared here for portfolio purposes.
+Final-year project — Usha Mittal Institute of Technology, S.N.D.T. Women's University, Data Science & Engineering Department.
+
+Developed by Shruti Vyavahare and Sumedha Gamare under guidance of Prof. Sheetal Mhatre.
 
 ---
 
