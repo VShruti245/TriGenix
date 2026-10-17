@@ -43,73 +43,6 @@ Single photo
 
 ---
 
-## Setup
-
-```bash
-# 1. Clone
-git clone https://github.com/VShruti245/3dModelGen.git
-cd 3dModelGen
-
-# 2. Virtual environment
-python -m venv venv
-venv\Scripts\activate        # Windows
-# source venv/bin/activate   # Linux/Mac
-
-# 3. Install dependencies
-pip install -r requirements.txt
-
-# 4. Configure
-cp .env.example .env
-# Edit .env if needed
-
-# 5. Model weights
-# Zero123++, DPT-Large, rembg — auto-downloaded on first run
-# TripoSR — place checkpoint in weights/
-
-# 6. Run
-python server.py
-# Open http://localhost:8000
-```
-
----
-
-## Running Tests
-
-```bash
-# Without GPU (fast)
-set TRIGENIX_SKIP_HEAVY_TESTS=1
-python -m pytest tests/ -q
-
-# Full suite (requires GPU + weights)
-python -m pytest tests/ -q
-```
-
----
-
-## Project Structure
-
-```
-server.py                 HTTP server + routing
-processor.py              Background removal, Zero123++, DPT depth
-reconstructor.py          TripoSR reconstruction, colour projection, export
-auth.py                   Authentication, sessions, history, shares
-printer.py                3D print job management
-mesh_repair.py            Automatic mesh repair
-pose_estimator.py         Input photo pose analysis
-quality_scorer.py         Mesh quality scoring
-confidence_mapper.py      Per-vertex confidence mapping
-multi_angle_processor.py  4-angle capture mode
-cleanup_worker.py         Stale job cleanup
-HTML/                     Frontend pages
-JS/                       Frontend JavaScript
-CSS/                      Stylesheets
-tests/                    82 automated tests
-requirements.txt          Python dependencies
-.env.example              Configuration template
-```
-
----
-
 ## Tech Stack
 
 | Layer | Technology |
@@ -136,14 +69,6 @@ requirements.txt          Python dependencies
 | Processing time (GPU) | 2 – 18 min |
 | Export formats | 9 |
 | Automated tests | 82 passing |
-
----
-
-## Academic Context
-
-Final-year project — Usha Mittal Institute of Technology, S.N.D.T. Women's University, Data Science & Engineering Department.
-
-Developed by Shruti Vyavahare and Sumedha Gamare under guidance of Prof. Sheetal Mhatre.
 
 ---
 
