@@ -29,6 +29,7 @@ __pycache__/
 *.mp4
 *.zip
 *.tar.gz
+*.log
 
 # ── Kiro / IDE ────────────────────────────────────────────────────────────────
 .kiro/
@@ -39,7 +40,18 @@ __pycache__/
 .vscode/
 .idea/
 
-# ── Junk one-off scripts ──────────────────────────────────────────────────────
+# ── Research paper, poster, presentations (hide from repo) ───────────────────
+paper/
+docs/
+poster_assets/
+output/
+*.pptx
+*.docx
+*.pdf
+Plagiarism Report.*
+plagiarism report/
+
+# ── One-off build/temp scripts ────────────────────────────────────────────────
 build_poster.py
 build_final*.py
 make_chart.py
@@ -53,32 +65,15 @@ patch_instantmesh.py
 check.py
 verify_fixes.py
 diag*.py
-
-# ── Poster duplicates (keep only docs/) ──────────────────────────────────────
-TriGenix_Poster_BlueTheme.pptx
-TriGenix_Poster_Final.pptx
-TriGenix_Poster_A3_Updated.pptx
-TriGenix_Poster_A4.pptx
-TriGenix_Poster_A4_Updated.pptx
-TriGenix_Exhibition_Poster.pptx
-TriGenix_Poster_Final2_Updated.pptx
-TriGenix_Poster_Final2_Updated_Technical.pptx
-
-# ── Plagiarism report ─────────────────────────────────────────────────────────
-Plagiarism Report.*
+fix_*.py
+test_repaint.py
+test2.py
 
 # ── Misc ─────────────────────────────────────────────────────────────────────
 directory.txt
-poster_assets/
 .DS_Store
 Thumbs.db
-
-# ── Paper build artifacts ─────────────────────────────────────────────────────
-paper/*.pdf
-paper/*.aux
-paper/*.log
-paper/*.out
-paper/*.toc
-paper/*.bbl
-paper/*.blg
-paper/*.synctex.gz
+terminal_op.mp4
+working.mp4
+working_majorphase1.mp4
+working.zip
