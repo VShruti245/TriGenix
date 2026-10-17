@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TriGenix — Sign In</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../CSS/StyleDrop.css">
+  <style>
+    .auth-page {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(139,127,248,.09) 0%, transparent 65%);
+    }
+
+    .auth-card {
+      width: 100%;
+      max-width: 420px;
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: var(--r);
+      padding: 36px 32px;
+    }
+
+    .auth-logo {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: .5rem;
+      margin-bottom: 28px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: -.02em;
+    }
+    .auth-logo-mark { width: 28px; height: 28px; }
+    .auth-logo-mark svg { width: 28px; height: 28px; overflow: visible; }
+
+    .auth-tabs {
+      display: flex;
+      background: var(--bg);
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      padding: 3px;
+      margin-bottom: 28px;
+      gap: 3px;
+    }
+    .auth-tab {
+      flex: 1;
+      padding: 8px;
+      text-align: center;
+      font-family: var(--mono);
+      font-size: .75rem;
+      color: var(--muted);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all .15s;
+      border: none;
+      background: transparent;
+    }
+    .auth-tab.active {
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border2);
+    }
+
+    .auth-form { display: flex; flex-direction: column; gap: 14px; }
+    .auth-form.hidden { display: none; }
+
+    .field-group { display: flex; flex-direction: column; gap: 5px; }
+    .field-label {
+      font-family: var(--mono);
+      font-size: .65rem;
+      color: var(--sub);
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .field-input {
+      background: var(--bg);
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      padding: 11px 14px;
+      color: var(--text);
+      font-family: var(--font);
+      font-size: .88rem;
+      outline: none;
+      transition: border-color .15s;
+      width: 100%;
+    }
+    .field-input:focus { border-color: var(--acc); }
+    .field-input::placeholder { color: var(--muted); }
+
+    .auth-btn {
+      width: 100%;
+      padding: 13px;
+      margin-top: 6px;
+      border: none;
+      border-radius: 9px;
+      background: var(--text);
+      color: var(--bg);
+      font-family: var(--mono);
+      font-size: .84rem;
+      font-weight: 700;
+      letter-spacing: .4px;
+      cursor: pointer;
+      transition: opacity .18s, transform .12s;
+    }
+    .auth-btn:disabled { opacity: .25; cursor: not-allowed; }
+    .auth-btn:not(:disabled):hover { opacity: .88; transform: translateY(-1px); }
+
+    .auth-error {
+      display: none;
+      background: rgba(255,107,107,.07);
+      border: 1px solid rgba(255,107,107,.3);
+      border-radius: 7px;
+      padding: 10px 13px;
+      font-size: .78rem;
+      color: var(--red);
+    }
+    .auth-error.show { display: block; }
+
+    .auth-success {
+      display: none;
+      background: rgba(74,222,128,.07);
+      border: 1px solid rgba(74,222,128,.25);
+      border-radius: 7px;
+      padding: 10px 13px;
+      font-size: .78rem;
+      color: var(--green);
+    }
+    .auth-success.show { display: block; }
+
+    .auth-footer {
+      text-align: center;
+      margin-top: 20px;
+      font-size: .75rem;
+      color: var(--muted);
+    }
+    .auth-footer a { color: var(--acc); }
+
+    .session-info {
+      display: none;
+      margin-top: 16px;
+      text-align: center;
+      font-family: var(--mono);
+      font-size: .68rem;
+      color: var(--muted);
+    }
+    .session-info.show { display: block; }
+    .session-info span { color: var(--acc2); }
+  </style>
+</head>
+<body>
+
+<div class="auth-page">
+  <div class="auth-card">
+
+    <!-- Logo -->
+    <div class="auth-logo">
+      <div class="auth-logo-mark">
+        <svg viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle class="tg-r1" cx="15" cy="15" r="4" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.5"/>
+          <circle class="tg-r2" cx="15" cy="15" r="4" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>
+          <circle class="tg-r3" cx="15" cy="15" r="4" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
+          <circle cx="15" cy="15" r="4" fill="white"/>
+        </svg>
+      </div>
+      TriGenix
+    </div>
+
+    <!-- Tabs -->
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tab-login"    onclick="showTab('login')">Sign In</button>
+      <button class="auth-tab"        id="tab-register" onclick="showTab('register')">Create Account</button>
+    </div>
+
+    <!-- Login form -->
+    <div class="auth-form" id="form-login">
+      <div id="login-error"   class="auth-error"></div>
+      <div id="login-success" class="auth-success"></div>
+
+      <div class="field-group">
+        <label class="field-label">Username</label>
+        <input class="field-input" id="l-username" type="text"
+               placeholder="your username" autocomplete="username">
+      </div>
+      <div class="field-group">
+        <label class="field-label">Password</label>
+        <input class="field-input" id="l-password" type="password"
+               placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button class="auth-btn" id="login-btn" onclick="doLogin()">SIGN IN</button>
+
+      <div class="session-info" id="session-info">
+        Session valid for <span>5 hours</span> from login
+      </div>
+    </div>
+
+    <!-- Register form -->
+    <div class="auth-form hidden" id="form-register">
+      <div id="reg-error"   class="auth-error"></div>
+      <div id="reg-success" class="auth-success"></div>
+
+      <div class="field-group">
+        <label class="field-label">Username</label>
+        <input class="field-input" id="r-username" type="text"
+               placeholder="choose a username" autocomplete="username">
+      </div>
+      <div class="field-group">
+        <label class="field-label">Email</label>
+        <input class="field-input" id="r-email" type="email"
+               placeholder="you@example.com" autocomplete="email">
+      </div>
+      <div class="field-group">
+        <label class="field-label">Password</label>
+        <input class="field-input" id="r-password" type="password"
+               placeholder="min 6 characters" autocomplete="new-password">
+      </div>
+      <button class="auth-btn" id="register-btn" onclick="doRegister()">CREATE ACCOUNT</button>
+    </div>
+
+    <div class="auth-footer">
+      <a href="../HTML/trigenix.html">← Back to Home</a>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ── If already logged in, redirect ──────────────────────────────────────────
+(function() {
+  var token = localStorage.getItem('tg_token');
+  if (!token) return;
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', '/auth/me', true);
+  xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+  xhr.onload = function() {
+    try {
+      var d = JSON.parse(xhr.responseText);
+      if (d.ok) window.location.href = '/HTML/DropImage.html';
+    } catch(e) {}
+  };
+  xhr.send();
+})();
+
+function showTab(tab) {
+  document.getElementById('tab-login').classList.toggle('active',    tab === 'login');
+  document.getElementById('tab-register').classList.toggle('active', tab === 'register');
+  document.getElementById('form-login').classList.toggle('hidden',    tab !== 'login');
+  document.getElementById('form-register').classList.toggle('hidden', tab !== 'register');
+}
+
+function _setError(prefix, msg) {
+  var el = document.getElementById(prefix + '-error');
+  el.textContent = msg;
+  el.classList.add('show');
+  document.getElementById(prefix + '-success').classList.remove('show');
+}
+function _setSuccess(prefix, msg) {
+  var el = document.getElementById(prefix + '-success');
+  el.textContent = msg;
+  el.classList.add('show');
+  document.getElementById(prefix + '-error').classList.remove('show');
+}
+function _clearMsg(prefix) {
+  document.getElementById(prefix + '-error').classList.remove('show');
+  document.getElementById(prefix + '-success').classList.remove('show');
+}
+
+function doLogin() {
+  _clearMsg('login');
+  var username = document.getElementById('l-username').value.trim();
+  var password = document.getElementById('l-password').value;
+  if (!username || !password) { _setError('login', 'Please fill all fields'); return; }
+
+  var btn = document.getElementById('login-btn');
+  btn.disabled = true; btn.textContent = 'SIGNING IN…';
+
+  var xhr = new XMLHttpRequest();
+  xhr.open('POST', '/auth/login', true);
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  xhr.onload = function() {
+    btn.disabled = false; btn.textContent = 'SIGN IN';
+    try {
+      var d = JSON.parse(xhr.responseText);
+      if (d.ok) {
+        localStorage.setItem('tg_token',    d.token);
+        localStorage.setItem('tg_username', d.username);
+        _setSuccess('login', 'Welcome back, ' + d.username + '! Redirecting…');
+        document.getElementById('session-info').classList.add('show');
+        setTimeout(function() { window.location.href = '/HTML/DropImage.html'; }, 900);
+      } else {
+        _setError('login', d.error || 'Login failed');
+      }
+    } catch(e) { _setError('login', 'Server error'); }
+  };
+  xhr.onerror = function() {
+    btn.disabled = false; btn.textContent = 'SIGN IN';
+    _setError('login', 'Cannot reach server');
+  };
+  xhr.send(JSON.stringify({ username: username, password: password }));
+}
+
+function doRegister() {
+  _clearMsg('reg');
+  var username = document.getElementById('r-username').value.trim();
+  var email    = document.getElementById('r-email').value.trim();
+  var password = document.getElementById('r-password').value;
+  if (!username || !email || !password) { _setError('reg', 'Please fill all fields'); return; }
+
+  var btn = document.getElementById('register-btn');
+  btn.disabled = true; btn.textContent = 'CREATING…';
+
+  var xhr = new XMLHttpRequest();
+  xhr.open('POST', '/auth/register', true);
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  xhr.onload = function() {
+    btn.disabled = false; btn.textContent = 'CREATE ACCOUNT';
+    try {
+      var d = JSON.parse(xhr.responseText);
+      if (d.ok) {
+        _setSuccess('reg', 'Account created! Sign in to continue.');
+        setTimeout(function() { showTab('login'); }, 1200);
+      } else {
+        _setError('reg', d.error || 'Registration failed');
+      }
+    } catch(e) { _setError('reg', 'Server error'); }
+  };
+  xhr.onerror = function() {
+    btn.disabled = false; btn.textContent = 'CREATE ACCOUNT';
+    _setError('reg', 'Cannot reach server');
+  };
+  xhr.send(JSON.stringify({ username: username, email: email, password: password }));
+}
+
+// Enter key support
+document.addEventListener('keydown', function(e) {
+  if (e.key !== 'Enter') return;
+  var loginHidden = document.getElementById('form-login').classList.contains('hidden');
+  if (!loginHidden) doLogin(); else doRegister();
+});
+</script>
+</body>
+</html>

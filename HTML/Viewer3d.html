@@ -1,0 +1,1061 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TriGenix — 3D Viewer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=IBM+Plex+Mono:wght@300;400&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../CSS/StyleDrop.css">
+<style>
+/* Viewer-specific overrides — body must be full-height, no scroll */
+body {
+  overflow: hidden;
+  height: 100vh;
+  min-height: unset;
+  background: #282828;
+  font-family: 'Inter', sans-serif;
+}
+
+/* Push the app shell below the shared nav */
+#app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding-top: var(--nav-h);
+}
+
+/* ── Viewer topbar ──────────────────────────────────────────── */
+#topbar {
+  height: 36px; flex-shrink: 0;
+  display: flex; align-items: center; padding: 0 12px; gap: 10px;
+  background: rgba(0,0,0,.94);
+  border-bottom: 1px solid rgba(255,255,255,.12);
+  z-index: 100;
+}
+.vt-logo {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: .66rem; letter-spacing: .18em;
+  color: rgba(255,255,255,.7); text-transform: uppercase;
+}
+.t-sep { width: 1px; height: 11px; background: rgba(255,255,255,.18); }
+.t-info { font-family: 'IBM Plex Mono', monospace; font-size: .58rem; color: rgba(255,255,255,.5); }
+.t-info b { color: #fff; font-weight: 400; }
+.t-right { margin-left: auto; display: flex; gap: 4px; }
+.t-btn {
+  font-family: 'IBM Plex Mono', monospace; font-size: .58rem;
+  padding: 2px 9px; border: 1px solid rgba(255,255,255,.18);
+  border-radius: 3px; background: transparent; color: rgba(255,255,255,.6);
+  cursor: pointer; letter-spacing: .04em; transition: color .1s, border-color .1s;
+}
+.t-btn:hover { color: #fff; border-color: rgba(255,255,255,.35); }
+.t-btn.primary { color: rgba(255,255,255,.65); border-color: rgba(255,255,255,.22); }
+.t-btn.primary:hover { color: #fff; background: rgba(255,255,255,.04); }
+.t-btn:disabled { opacity: .2; cursor: not-allowed; }
+
+/* ── Main area ──────────────────────────────────────────────── */
+#main { flex: 1; position: relative; overflow: hidden; }
+
+:root {
+  --v-surface: rgba(10,10,10,.92);
+  --v-border:  rgba(255,255,255,.16);
+  --v-border2: rgba(255,255,255,.28);
+  --v-text:    #ffffff;
+  --v-muted:   rgba(255,255,255,.75);
+  --v-dim:     rgba(255,255,255,.50);
+  --v-r: 8px;
+}
+
+.panel {
+  position: absolute; top: 10px; bottom: 10px; width: 192px;
+  background: var(--v-surface);
+  border: 1px solid var(--v-border);
+  border-radius: var(--v-r);
+  backdrop-filter: blur(28px) saturate(110%);
+  -webkit-backdrop-filter: blur(28px) saturate(110%);
+  display: flex; flex-direction: column; z-index: 20; overflow: hidden;
+}
+#left-panel  { left: 10px; }
+#right-panel { right: 10px; }
+
+.pscroll { flex: 1; overflow-y: auto; overflow-x: hidden; }
+.pscroll::-webkit-scrollbar { width: 2px; }
+.pscroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); border-radius: 2px; }
+
+.ps { padding: 10px 10px 12px; border-bottom: 1px solid var(--v-border); }
+.ps:last-child { border-bottom: none; }
+
+.pl {
+  font-family: 'IBM Plex Mono', monospace; font-size: .5rem;
+  color: var(--v-dim); letter-spacing: .16em;
+  text-transform: uppercase; margin-bottom: 8px;
+}
+
+.sr { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; }
+.sr:last-child { margin-bottom: 0; }
+.ax { font-family: 'IBM Plex Mono', monospace; font-size: .56rem; width: 10px; text-align: center; flex-shrink: 0; }
+.ax.x{color:#ff5252;} .ax.y{color:#52ff85;} .ax.z{color:#528eff;}
+
+input[type=range] {
+  flex: 1; height: 2px; -webkit-appearance: none;
+  background: rgba(255,255,255,.1); border-radius: 2px; outline: none; cursor: pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 8px; height: 8px; border-radius: 50%;
+  background: #fff; cursor: pointer; transition: transform .1s;
+}
+input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.45); }
+
+.sv { font-family: 'IBM Plex Mono', monospace; font-size: .54rem; color: var(--v-muted); width: 28px; text-align: right; flex-shrink: 0; }
+
+.pr { margin-bottom: 7px; }
+.pr:last-child { margin-bottom: 0; }
+.prl { display: flex; justify-content: space-between; font-family: 'IBM Plex Mono', monospace; font-size: .55rem; color: var(--v-muted); margin-bottom: 3px; }
+.prl span { color: rgba(255,255,255,.9); }
+
+.vg { display: grid; grid-template-columns: repeat(3,1fr); gap: 3px; }
+.vb {
+  font-family: 'IBM Plex Mono', monospace; font-size: .5rem; padding: 4px 2px;
+  border: 1px solid var(--v-border); background: transparent; color: var(--v-muted);
+  border-radius: 3px; cursor: pointer; text-align: center; transition: all .1s; letter-spacing: .04em;
+}
+.vb:hover { color: #fff; border-color: var(--v-border2); }
+.vb.active { color: #fff; border-color: rgba(255,255,255,.32); background: rgba(255,255,255,.04); }
+.vb.wide { grid-column: span 3; }
+
+.cg { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.ci { display: flex; flex-direction: column; gap: 3px; }
+.ci label { font-family: 'IBM Plex Mono', monospace; font-size: .52rem; color: var(--v-muted); }
+.ci input[type=color] {
+  width: 100%; height: 20px; border: 1px solid var(--v-border2); border-radius: 3px;
+  background: transparent; cursor: pointer; padding: 2px;
+}
+.ci input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
+.ci input[type=color]::-webkit-color-swatch { border-radius: 2px; border: none; }
+
+.tg { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; cursor: pointer; }
+.tg:last-child { margin-bottom: 0; }
+.tg-l { font-family: 'IBM Plex Mono', monospace; font-size: .55rem; color: var(--v-muted); }
+.tg input[type=checkbox] { display: none; }
+.sw {
+  width: 22px; height: 12px; background: rgba(255,255,255,.08);
+  border-radius: 6px; position: relative; transition: background .14s;
+  border: 1px solid var(--v-border2); flex-shrink: 0;
+}
+.tg input:checked + .sw { background: rgba(255,255,255,.22); border-color: rgba(255,255,255,.32); }
+.sw::after {
+  content: ''; position: absolute; width: 8px; height: 8px;
+  background: rgba(255,255,255,.38); border-radius: 50%;
+  top: 1px; left: 1px; transition: transform .14s, background .14s;
+}
+.tg input:checked + .sw::after { transform: translateX(10px); background: #fff; }
+
+select {
+  width: 100%; font-family: 'IBM Plex Mono', monospace; font-size: .58rem;
+  padding: 5px 22px 5px 7px; background: rgba(255,255,255,.03);
+  border: 1px solid var(--v-border2); border-radius: 3px;
+  color: rgba(255,255,255,.85); outline: none; cursor: pointer;
+  appearance: none; -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='rgba(255,255,255,0.2)'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 7px center; background-size: 7px;
+}
+select option { background: #0a0a0a; color: #fff; }
+
+.str { display: flex; justify-content: space-between; margin-bottom: 4px; }
+.str:last-child { margin-bottom: 0; }
+.stk,.stv { font-family: 'IBM Plex Mono', monospace; font-size: .54rem; }
+.stk { color: var(--v-dim); }
+.stv { color: rgba(255,255,255,.9); }
+
+.ab {
+  font-family: 'IBM Plex Mono', monospace; font-size: .56rem; padding: 5px 7px;
+  border: 1px solid var(--v-border); background: transparent; color: var(--v-muted);
+  border-radius: 3px; cursor: pointer; width: 100%; text-align: left; margin-bottom: 3px;
+  transition: color .1s, border-color .1s, background .1s;
+}
+.ab:last-child { margin-bottom: 0; }
+.ab:hover { color: #fff; border-color: var(--v-border2); background: rgba(255,255,255,.03); }
+
+#viewport-wrap { position: absolute; inset: 0; overflow: hidden; }
+#three-canvas  { position: absolute; inset: 0; width: 100%!important; height: 100%!important; }
+
+.hud {
+  position: absolute; font-family: 'IBM Plex Mono', monospace;
+  font-size: .52rem; color: rgba(255,255,255,.4); pointer-events: none; letter-spacing: .07em;
+}
+#h-tl{top:12px;left:215px;} #h-tr{top:12px;right:215px;text-align:right;}
+#h-bl{bottom:12px;left:215px;} #h-br{bottom:12px;right:215px;text-align:right;}
+
+#axis-gizmo { position: absolute; bottom: 30px; right: 215px; width: 52px; height: 52px; pointer-events: none; opacity: .6; }
+
+#no-model {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 8px; pointer-events: none; z-index: 5;
+}
+#no-model.hidden { display: none; }
+.nm-svg { width: 44px; height: 44px; opacity: .07; }
+.nm-t { font-size: .74rem; font-weight: 300; color: rgba(255,255,255,.18); letter-spacing: .04em; }
+.nm-s { font-family: 'IBM Plex Mono', monospace; font-size: .54rem; color: rgba(255,255,255,.1); letter-spacing: .08em; }
+.nm-btn {
+  font-family: 'IBM Plex Mono', monospace; font-size: .58rem; padding: 6px 14px; margin-top: 4px;
+  border: 1px solid rgba(255,255,255,.12); background: transparent;
+  color: rgba(255,255,255,.28); border-radius: 3px; cursor: pointer; pointer-events: all;
+  transition: all .12s; letter-spacing: .05em;
+}
+.nm-btn:hover { color: #fff; border-color: rgba(255,255,255,.38); }
+
+#loading {
+  position: absolute; inset: 0; background: rgba(0,0,0,.9); display: flex;
+  flex-direction: column; align-items: center; justify-content: center; gap: 12px; z-index: 50;
+}
+#loading.hidden { display: none; }
+.spin { width: 26px; height: 26px; border: 1px solid rgba(255,255,255,.1); border-top-color: rgba(255,255,255,.6); border-radius: 50%; animation: spin .7s linear infinite; }
+@keyframes spin { to{transform:rotate(360deg);} }
+.lmsg { font-family: 'IBM Plex Mono', monospace; font-size: .58rem; color: rgba(255,255,255,.28); letter-spacing: .06em; }
+.ltrack { width: 130px; height: 1px; background: rgba(255,255,255,.07); border-radius: 1px; }
+.lfill  { height: 100%; background: rgba(255,255,255,.42); border-radius: 1px; width: 0%; transition: width .28s; }
+
+#drop-overlay {
+  position: absolute; inset: 0; background: rgba(0,0,0,.9); display: flex;
+  flex-direction: column; align-items: center; justify-content: center; gap: 7px;
+  z-index: 40; opacity: 0; pointer-events: none; transition: opacity .14s;
+}
+#drop-overlay.visible { opacity: 1; pointer-events: all; }
+.dring {
+  width: 52px; height: 52px; border: 1px solid rgba(255,255,255,.16); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; font-size: 1.2rem; margin-bottom: 3px;
+}
+.dt { font-size: .78rem; font-weight: 300; color: rgba(255,255,255,.55); letter-spacing: .04em; }
+.ds { font-family: 'IBM Plex Mono', monospace; font-size: .56rem; color: rgba(255,255,255,.2); letter-spacing: .1em; }
+
+#toast {
+  position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%) translateY(10px);
+  background: rgba(8,8,8,.96); border: 1px solid rgba(255,255,255,.08);
+  color: rgba(255,255,255,.45); padding: 5px 13px; border-radius: 3px;
+  font-family: 'IBM Plex Mono', monospace; font-size: .56rem; letter-spacing: .05em;
+  opacity: 0; transition: all .2s; z-index: 999; white-space: nowrap;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+input[type=file]#file-picker { display: none; }
+
+/* Quality score bars */
+.qbar-row { display:flex; align-items:center; gap:6px; margin-bottom:5px; }
+.qbar-label { font-family:'IBM Plex Mono',monospace; font-size:.54rem; color:rgba(255,255,255,.5); width:72px; flex-shrink:0; text-transform:uppercase; letter-spacing:.04em; }
+.qbar-track { flex:1; height:5px; background:rgba(255,255,255,.08); border-radius:3px; }
+.qbar-fill { height:100%; border-radius:3px; transition:width .4s; }
+.qbar-val { font-family:'IBM Plex Mono',monospace; font-size:.54rem; color:rgba(255,255,255,.6); width:28px; text-align:right; flex-shrink:0; }
+.qbar-fill.green { background:#4ade80; }
+.qbar-fill.amber { background:#ffd166; }
+.qbar-fill.red   { background:#ff8a8a; }
+</style>
+</head>
+<body>
+
+<!-- ── Shared TriGenix Nav ───────────────────────────────────── -->
+<nav class="tg-nav">
+  <div class="tg-nav-left">
+    <a href="../trigenix.html" class="tg-logo">
+      <div class="tg-logo-mark">
+        <svg viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle class="tg-r1" cx="15" cy="15" r="4" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.5"/>
+          <circle class="tg-r2" cx="15" cy="15" r="4" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>
+          <circle class="tg-r3" cx="15" cy="15" r="4" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
+          <circle cx="15" cy="15" r="4" fill="white"/>
+        </svg>
+      </div>
+      TriGenix
+    </a>
+    <div class="tg-nav-links">
+      <a href="../trigenix.html">Home</a>
+      <a href="../trigenix.html#features">Features</a>
+      <a href="DropImage.html">Generate</a>
+      <a href="Viewer3d.html" class="active">3D Viewer</a>
+    </div>
+  </div>
+  <div class="tg-nav-right">
+    <a href="DropImage.html" class="tg-btn-ghost">← Back to Generate</a>
+  </div>
+</nav>
+
+<!-- ── App Shell ─────────────────────────────────────────────── -->
+<div id="app-shell">
+
+<div id="topbar">
+  <span class="vt-logo">3D Viewer</span>
+  <div class="t-sep"></div>
+  <div class="t-info" id="t-name">no file loaded</div>
+  <div class="t-sep"></div>
+  <div class="t-info">V&nbsp;<b id="t-verts">—</b></div>
+  <div class="t-info">F&nbsp;<b id="t-faces">—</b></div>
+  <div class="t-info" id="measure-info" style="color:#69d8b6;"></div>
+  <div class="t-right">
+    <button class="t-btn" onclick="document.getElementById('file-picker').click()">open</button>
+    <button class="t-btn primary" id="dl-btn" onclick="downloadModel()" disabled>download .glb</button>
+    <button class="t-btn" id="uv-toggle-btn" style="display:none;" onclick="toggleUVMode()">UV Tex</button>
+    <button class="t-btn" id="measure-btn" onclick="toggleMeasure()">📏 Measure</button>
+    <button class="t-btn" onclick="toggleFullscreen()" id="fs-btn">⛶ fullscreen</button>
+  </div>
+</div>
+<input type="file" id="file-picker" accept=".glb,.gltf,.obj" onchange="loadFromInput(this)">
+
+<div id="main">
+  <div id="viewport-wrap">
+    <canvas id="three-canvas"></canvas>
+
+    <div id="no-model">
+      <svg class="nm-svg" viewBox="0 0 48 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M24 2L46 14V42L24 54L2 42V14L24 2Z" stroke="white" stroke-width="1.2"/>
+        <path d="M24 2V54M2 14L46 14M2 42L46 42M24 2L2 14M24 2L46 14" stroke="white" stroke-width="0.5" opacity="0.4"/>
+      </svg>
+      <div class="nm-t">No model loaded</div>
+      <div class="nm-s">.glb &nbsp;·&nbsp; .gltf &nbsp;·&nbsp; .obj</div>
+      <button class="nm-btn" onclick="document.getElementById('file-picker').click()">browse files</button>
+    </div>
+
+    <div id="loading" class="hidden">
+      <div class="spin"></div>
+      <div class="lmsg" id="load-msg">loading…</div>
+      <div class="ltrack"><div class="lfill" id="load-bar"></div></div>
+    </div>
+
+    <div id="drop-overlay">
+      <div class="dring">⬡</div>
+      <div class="dt">Drop model</div>
+      <div class="ds">.glb · .gltf · .obj</div>
+    </div>
+
+    <div class="hud" id="h-tl">PERSPECTIVE</div>
+    <div class="hud" id="h-tr">orbit · pan · scroll</div>
+    <div class="hud" id="h-bl"></div>
+    <div class="hud" id="h-br">TriGenix 3D</div>
+    <canvas id="axis-gizmo"></canvas>
+  </div>
+
+  <!-- LEFT PANEL -->
+  <div class="panel" id="left-panel">
+    <div class="pscroll">
+      <div class="ps">
+        <div class="pl">View</div>
+        <div class="vg">
+          <button class="vb" onclick="setView('front',event)">FR</button>
+          <button class="vb" onclick="setView('back',event)">BK</button>
+          <button class="vb" onclick="setView('top',event)">TP</button>
+          <button class="vb" onclick="setView('bottom',event)">BT</button>
+          <button class="vb" onclick="setView('left',event)">LT</button>
+          <button class="vb" onclick="setView('right',event)">RT</button>
+          <button class="vb wide active" onclick="setView('persp',event)">PERSP</button>
+        </div>
+      </div>
+      <div class="ps">
+        <div class="pl">Position</div>
+        <div class="sr"><span class="ax x">X</span><input type="range" id="pos-x" min="-5" max="5" step="0.01" value="0" oninput="applyTransform()"><span class="sv" id="v-px">0.00</span></div>
+        <div class="sr"><span class="ax y">Y</span><input type="range" id="pos-y" min="-5" max="5" step="0.01" value="0" oninput="applyTransform()"><span class="sv" id="v-py">0.00</span></div>
+        <div class="sr"><span class="ax z">Z</span><input type="range" id="pos-z" min="-5" max="5" step="0.01" value="0" oninput="applyTransform()"><span class="sv" id="v-pz">0.00</span></div>
+      </div>
+      <div class="ps">
+        <div class="pl">Rotation</div>
+        <div class="sr"><span class="ax x">X</span><input type="range" id="rot-x" min="-180" max="180" value="0" oninput="applyTransform()"><span class="sv" id="v-rx">0°</span></div>
+        <div class="sr"><span class="ax y">Y</span><input type="range" id="rot-y" min="-180" max="180" value="0" oninput="applyTransform()"><span class="sv" id="v-ry">0°</span></div>
+        <div class="sr"><span class="ax z">Z</span><input type="range" id="rot-z" min="-180" max="180" value="0" oninput="applyTransform()"><span class="sv" id="v-rz">0°</span></div>
+      </div>
+      <div class="ps">
+        <div class="pl">Scale</div>
+        <div class="sr"><span class="ax x">X</span><input type="range" id="sc-x" min="0.1" max="4" step="0.01" value="1" oninput="applyTransform()"><span class="sv" id="v-sx">1.00</span></div>
+        <div class="sr"><span class="ax y">Y</span><input type="range" id="sc-y" min="0.1" max="4" step="0.01" value="1" oninput="applyTransform()"><span class="sv" id="v-sy">1.00</span></div>
+        <div class="sr"><span class="ax z">Z</span><input type="range" id="sc-z" min="0.1" max="4" step="0.01" value="1" oninput="applyTransform()"><span class="sv" id="v-sz">1.00</span></div>
+      </div>
+      <div class="ps">
+        <div class="pl">Info</div>
+        <div class="str"><span class="stk">vertices</span><span class="stv" id="s-verts">—</span></div>
+        <div class="str"><span class="stk">faces</span><span class="stv" id="s-faces">—</span></div>
+        <div class="str"><span class="stk">format</span><span class="stv" id="s-format">—</span></div>
+        <div class="str"><span class="stk">size</span><span class="stv" id="s-size">—</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="panel" id="right-panel">
+    <div class="pscroll">
+      <div class="ps">
+        <div class="pl">Shading</div>
+        <select id="shade-mode" onchange="applyShading()">
+          <option value="solid">Solid (Vertex Colors)</option>
+          <option value="wireframe">Wireframe</option>
+          <option value="wireframe-solid">Wireframe + Solid</option>
+          <option value="matcap">MatCap</option>
+          <option value="normals">Normals</option>
+        </select>
+      </div>
+      <div class="ps" id="quality-section" style="display:none;">
+        <div class="pl">Quality Score</div>
+        <div id="quality-bars"></div>
+        <div style="margin-top:6px;font-family:'IBM Plex Mono',monospace;font-size:.58rem;color:rgba(255,255,255,.35);">
+          <span id="wt-badge"></span>
+        </div>
+      </div>
+      <div class="ps">
+        <div class="pl">Material</div>
+        <div class="cg" style="margin-bottom:8px">
+          <div class="ci"><label>tint</label><input type="color" id="col-base" value="#ffffff" oninput="applyMaterial()"></div>
+          <div class="ci"><label>emissive</label><input type="color" id="col-emit" value="#000000" oninput="applyMaterial()"></div>
+        </div>
+        <div class="pr"><div class="prl">metalness <span id="v-metal">0.00</span></div><input type="range" id="sl-metal" min="0" max="1" step="0.01" value="0" oninput="applyMaterial()"></div>
+        <div class="pr"><div class="prl">roughness <span id="v-rough">0.60</span></div><input type="range" id="sl-rough" min="0" max="1" step="0.01" value="0.6" oninput="applyMaterial()"></div>
+        <div class="pr"><div class="prl">opacity <span id="v-opac">1.00</span></div><input type="range" id="sl-opac" min="0.05" max="1" step="0.01" value="1" oninput="applyMaterial()"></div>
+      </div>
+      <div class="ps">
+        <div class="pl">Scene</div>
+        <div class="ci" style="margin-bottom:8px"><label>background</label><input type="color" id="col-bg" value="#282828" oninput="applyScene()"></div>
+        <label class="tg"><span class="tg-l">grid</span><input type="checkbox" id="tog-grid" checked onchange="applyScene()"><div class="sw"></div></label>
+        <label class="tg"><span class="tg-l">shadows</span><input type="checkbox" id="tog-shadow" checked onchange="applyScene()"><div class="sw"></div></label>
+        <label class="tg"><span class="tg-l">auto rotate</span><input type="checkbox" id="tog-rotate" onchange="applyScene()"><div class="sw"></div></label>
+      </div>
+      <div class="ps">
+        <div class="pl">Lighting</div>
+        <div style="display:flex;gap:5px;margin-bottom:8px;">
+          <button class="ab" onclick="applyLightPreset('studio')"   style="flex:1;font-size:.62rem;">Studio</button>
+          <button class="ab" onclick="applyLightPreset('outdoor')"  style="flex:1;font-size:.62rem;">Outdoor</button>
+          <button class="ab" onclick="applyLightPreset('dark')"     style="flex:1;font-size:.62rem;">Dark</button>
+          <button class="ab" onclick="applyLightPreset('product')"  style="flex:1;font-size:.62rem;">Product</button>
+        </div>
+        <div class="pr"><div class="prl">ambient <span id="v-amb">1.20</span></div><input type="range" id="sl-amb" min="0" max="2" step="0.01" value="1.2" oninput="applyLighting()"></div>
+        <div class="pr"><div class="prl">key <span id="v-key">1.80</span></div><input type="range" id="sl-key" min="0" max="3" step="0.01" value="1.8" oninput="applyLighting()"></div>
+        <div class="pr"><div class="prl">fill <span id="v-fill">0.70</span></div><input type="range" id="sl-fill" min="0" max="2" step="0.01" value="0.7" oninput="applyLighting()"></div>
+        <div class="cg">
+          <div class="ci"><label>key</label><input type="color" id="col-key" value="#ffffff" oninput="applyLighting()"></div>
+          <div class="ci"><label>fill</label><input type="color" id="col-fill" value="#ffffff" oninput="applyLighting()"></div>
+        </div>
+      </div>
+      <div class="ps">
+        <div class="pl">Actions</div>
+        <button class="ab" onclick="resetTransform()">reset transform</button>
+        <button class="ab" onclick="centerModel()">center model</button>
+        <button class="ab" onclick="frameModel()">frame view</button>
+        <button class="ab" onclick="resetMaterial()">reset material</button>
+        <button class="ab" onclick="screenshotView()">screenshot</button>
+        <button class="ab" id="btn-defects" onclick="toggleDefects()" style="display:none;">Show Defects</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- #app-shell -->
+
+<div id="toast"></div>
+
+<script src="../JS/vendor/three.min.js"></script>
+<script src="../JS/vendor/GLTFLoader.js"></script>
+<script src="../JS/vendor/OBJLoader.js"></script>
+<script src="../JS/vendor/OrbitControls.js"></script>
+<script>
+// All Three.js dependencies loaded locally above - call initApp directly
+
+var renderer,scene,camera,controls;
+var currentModel=null,gridHelper=null;
+var _basePos=new THREE.Vector3();  // floor-aligned base position, set on model load
+var _authToken=localStorage.getItem('tg_token')||'';
+var ambientLight,keyLight,fillLight,rimLight,shadowPlane;
+var fileData=null,wireframeOverlay=null,gizmoCtx=null;
+var lastT=0,frames=0;
+var fpsEl=document.getElementById('h-bl');
+function ge(id){return document.getElementById(id);}
+
+function initApp(){
+  _basePos=new THREE.Vector3();
+  var canvas=ge('three-canvas'),wrap=ge('viewport-wrap');
+  renderer=new THREE.WebGLRenderer({canvas:canvas,antialias:true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.shadowMap.enabled=true;
+  renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  renderer.outputEncoding=THREE.sRGBEncoding;
+  renderer.toneMapping=THREE.NoToneMapping;  // No tone mapping: vertex colors stored as sRGB, display directly
+  renderer.toneMappingExposure=1.0;
+
+  scene=new THREE.Scene();
+  scene.background=new THREE.Color(0x282828);  // slightly lighter neutral gray — better contrast
+
+  camera=new THREE.PerspectiveCamera(45,wrap.clientWidth/wrap.clientHeight,0.01,2000);
+  camera.position.set(4,2.5,6);
+
+  controls=new THREE.OrbitControls(camera,canvas);
+  controls.enableDamping=true;controls.dampingFactor=0.06;controls.screenSpacePanning=false;
+
+  // Studio lighting: strong ambient + warm key + cool fill + subtle rim
+  // These values work for MeshStandardMaterial (used for vertex-colored meshes)
+  ambientLight=new THREE.AmbientLight(0xffffff,1.5);  // boosted for UV texture visibilityscene.add(ambientLight);
+  keyLight=new THREE.DirectionalLight(0xfff8f0,1.8);keyLight.position.set(4,8,5);keyLight.castShadow=true;
+  keyLight.shadow.mapSize.width=keyLight.shadow.mapSize.height=2048;
+  keyLight.shadow.camera.near=0.1;keyLight.shadow.camera.far=50;
+  keyLight.shadow.camera.left=keyLight.shadow.camera.bottom=-10;
+  keyLight.shadow.camera.right=keyLight.shadow.camera.top=10;
+  scene.add(keyLight);
+  fillLight=new THREE.DirectionalLight(0xc0d8ff,0.7);fillLight.position.set(-4,2,-4);scene.add(fillLight);
+  rimLight=new THREE.DirectionalLight(0x99aaff,0.4);rimLight.position.set(0,-2,-6);scene.add(rimLight);
+
+  gridHelper=new THREE.GridHelper(80,80,0x000000,0x000000);
+  gridHelper.position.y=0.001;
+  var gMats=Array.isArray(gridHelper.material)?gridHelper.material:[gridHelper.material];
+  gMats.forEach(function(m){m.opacity=0.5;m.transparent=true;});
+  scene.add(gridHelper);
+
+  shadowPlane=new THREE.Mesh(new THREE.PlaneGeometry(40,40),new THREE.ShadowMaterial({opacity:.16}));
+  shadowPlane.rotation.x=-Math.PI/2;shadowPlane.position.y=-0.001;shadowPlane.receiveShadow=true;
+  scene.add(shadowPlane);
+
+  new ResizeObserver(function(){
+    camera.aspect=wrap.clientWidth/wrap.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(wrap.clientWidth,wrap.clientHeight,false);
+  }).observe(wrap);
+  renderer.setSize(wrap.clientWidth,wrap.clientHeight,false);
+
+  wrap.addEventListener('dragover',function(e){e.preventDefault();ge('drop-overlay').classList.add('visible');});
+  wrap.addEventListener('dragleave',function(){ge('drop-overlay').classList.remove('visible');});
+  wrap.addEventListener('drop',function(e){
+    e.preventDefault();ge('drop-overlay').classList.remove('visible');
+    if(e.dataTransfer.files[0])loadFile(e.dataTransfer.files[0]);
+  });
+
+  // Measurement click handler
+  canvas.addEventListener('click', _onMeasureClick);
+
+  var p=new URLSearchParams(location.search);
+  if(p.get('model'))loadFromURL(decodeURIComponent(p.get('model')),p.get('name')||'model');
+
+  var gc=ge('axis-gizmo');gc.width=gc.height=52;gizmoCtx=gc.getContext('2d');
+
+  (function loop(t){
+    requestAnimationFrame(loop);
+    controls.update();
+    if(ge('tog-rotate').checked&&currentModel)currentModel.rotation.y+=0.005;
+    renderer.render(scene,camera);
+    if(gizmoCtx){
+      var ctx=gizmoCtx,cx=26,cy=26,len=17;
+      ctx.clearRect(0,0,52,52);
+      [{dir:new THREE.Vector3(1,0,0),col:'#ff5252',l:'X'},
+       {dir:new THREE.Vector3(0,1,0),col:'#52ff85',l:'Y'},
+       {dir:new THREE.Vector3(0,0,1),col:'#528eff',l:'Z'}
+      ].forEach(function(a){
+        var d=a.dir.clone().applyMatrix4(new THREE.Matrix4().extractRotation(camera.matrixWorldInverse));
+        var tx=cx+d.x*len,ty=cy-d.y*len;
+        ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(tx,ty);
+        ctx.strokeStyle=a.col;ctx.lineWidth=1.5;ctx.stroke();
+        ctx.fillStyle=a.col;ctx.font='7px IBM Plex Mono,monospace';
+        ctx.fillText(a.l,tx+(d.x>0?2:-6),ty+(d.y<0?-2:8));
+      });
+      ctx.beginPath();ctx.arc(cx,cy,2.2,0,Math.PI*2);
+      ctx.fillStyle='rgba(255,255,255,0.22)';ctx.fill();
+    }
+    frames++;
+    if(t-lastT>=1000){fpsEl.textContent=frames+'fps';frames=0;lastT=t;}
+  })(0);
+}
+
+var _loadedUrl  = null;   // track URL of model loaded from URL param
+var _loadedName = null;
+
+function loadFromInput(inp){if(inp.files[0])loadFile(inp.files[0]);}
+function loadFile(file){
+  fileData=file; _loadedUrl=null; _loadedName=file.name;
+  var ext=file.name.split('.').pop().toLowerCase();
+  showLoading('reading…',15);
+  var url=URL.createObjectURL(file);
+  ext==='obj'?loadOBJ(url,file.name):loadGLTF(url,file.name);
+}
+function loadFromURL(url,name){
+  _loadedUrl=url; _loadedName=name||'model.glb'; fileData=null;
+  var ext=(_loadedName).split('.').pop().toLowerCase();
+  showLoading('fetching…',15);
+  var loadUrl=cacheBustAssetUrl(url);
+  ext==='obj'?loadOBJ(loadUrl,_loadedName):loadGLTF(loadUrl,_loadedName);
+}
+function cacheBustAssetUrl(url){
+  try{
+    var u=new URL(url,location.href);
+    u.searchParams.set('_v',Date.now().toString());
+    return u.href;
+  }catch(e){
+    return url+(url.indexOf('?')>=0?'&':'?')+'_v='+Date.now();
+  }
+}
+function loadGLTF(url,name){
+  if(!THREE.GLTFLoader){toast('GLTFLoader not available');hideLoading();return;}
+  setLoadMsg('fetching...',15);
+  var xhr=new XMLHttpRequest();
+  xhr.open('GET',url,true);
+  xhr.responseType='arraybuffer';
+  if(_authToken) xhr.setRequestHeader('Authorization','Bearer '+_authToken);
+  xhr.onprogress=function(e){if(e.total)setLoadMsg('loading '+Math.round(e.loaded/e.total*100)+'%',e.loaded/e.total*60+15);};
+  xhr.onload=function(){
+    if(xhr.status===401){toast('Session expired');hideLoading();setTimeout(function(){location.href='/HTML/Login.html';},1500);return;}
+    if(xhr.status!==200){toast('Load error (HTTP '+xhr.status+')');hideLoading();return;}
+    setLoadMsg('processing...',80);
+    var blob=new Blob([xhr.response],{type:'model/gltf-binary'});
+    var blobUrl=URL.createObjectURL(blob);
+    new THREE.GLTFLoader().load(blobUrl,
+      function(g){
+        URL.revokeObjectURL(blobUrl);
+        clearModel();finishLoad(g.scene,_loadedName||name,'GLB');
+        ge('dl-btn').disabled=false;
+      },
+      null,
+      function(e){URL.revokeObjectURL(blobUrl);toast('Parse error');hideLoading();}
+    );
+  };
+  xhr.onerror=function(){toast('Network error');hideLoading();};
+  xhr.send();
+}
+function loadOBJ(url,name){
+  if(!THREE.OBJLoader){toast('OBJLoader not available');hideLoading();return;}
+  new THREE.OBJLoader().load(url,
+    function(obj){
+      setLoadMsg('processing…',70);clearModel();
+      obj.traverse(function(c){if(c.isMesh)c.material=new THREE.MeshStandardMaterial({color:0xcccccc,roughness:.5});});
+      finishLoad(obj,name,'OBJ');ge('dl-btn').disabled=false;
+    },
+    function(x){if(x.total)setLoadMsg('loading '+Math.round(x.loaded/x.total*100)+'%',x.loaded/x.total*55+15);},
+    function(){toast('load error');hideLoading();}
+  );
+}
+function finishLoad(model,name,fmt){
+  var box=new THREE.Box3().setFromObject(model);
+  var sz=box.getSize(new THREE.Vector3());
+  var sc=Math.max(sz.x,sz.y,sz.z)>0?3/Math.max(sz.x,sz.y,sz.z):1;
+  model.scale.multiplyScalar(sc);
+  var box2=new THREE.Box3().setFromObject(model);
+  var ct2=box2.getCenter(new THREE.Vector3());
+  var h=box2.getSize(new THREE.Vector3()).y;
+  model.position.set(-ct2.x,-box2.min.y,-ct2.z);
+  _basePos.set(-ct2.x,-box2.min.y,-ct2.z);  // store floor-aligned base for slider offsets
+  model.traverse(function(c){
+    if(!c.isMesh)return;
+    c.castShadow=true;c.receiveShadow=true;
+    var hasVC=!!(c.geometry&&c.geometry.attributes.color);
+    var mats=Array.isArray(c.material)?c.material:[c.material];
+    var hasMap=mats.some(function(mt){return !!(mt&&mt.map);});
+    if(hasVC){
+      // MeshBasicMaterial for vertex colors: shows stored colors at face value.
+      // MeshStandardMaterial darkens vertex colors via ACES tone mapping.
+      // Vertex colors are already the correct sRGB values from the photo/atlas.
+      c.material=new THREE.MeshBasicMaterial({
+        vertexColors:true,
+        side:THREE.DoubleSide
+      });
+    } else if(hasMap){
+      // UV texture map (from TripoSR atlas): use MeshStandardMaterial with
+      // proper lighting so texture detail is visible.
+      mats.forEach(function(mt){
+        mt.side=THREE.DoubleSide;
+        mt.roughness=0.7;
+        mt.metalness=0.0;
+        mt.needsUpdate=true;
+      });
+    } else {
+      c.material=new THREE.MeshStandardMaterial({color:0xcccccc,roughness:0.6,metalness:0,side:THREE.DoubleSide});
+    }
+    c.material.needsUpdate=true;
+  });
+  scene.add(model);currentModel=model;
+  ge('no-model').classList.add('hidden');
+  var v=0,f=0;
+  model.traverse(function(c){
+    if(c.isMesh&&c.geometry){
+      var p=c.geometry.attributes.position;if(p)v+=p.count;
+      var i=c.geometry.index;f+=i?i.count/3:(p?p.count/3:0);
+    }
+  });
+  var vc=v.toLocaleString(),fc=Math.round(f).toLocaleString();
+  ge('t-verts').textContent=vc;ge('t-faces').textContent=fc;ge('t-name').textContent=name;
+  ge('s-verts').textContent=vc;ge('s-faces').textContent=fc;ge('s-format').textContent=fmt;
+  if(fileData)ge('s-size').textContent=(fileData.size/1024).toFixed(1)+' KB';
+  ge('pos-x').value=currentModel.position.x.toFixed(2);
+  ge('pos-y').value=currentModel.position.y.toFixed(2);
+  ge('pos-z').value=currentModel.position.z.toFixed(2);
+  ['rot-x','rot-y','rot-z'].forEach(function(i){ge(i).value=0;});
+  ['sc-x','sc-y','sc-z'].forEach(function(i){ge(i).value=1;});
+  frameModel();setLoadMsg('done',100);setTimeout(hideLoading,400);toast(name);
+  loadQualityReport();
+  loadConfidenceMap();
+  checkUVAvailable();
+}
+function clearModel(){
+  if(currentModel){scene.remove(currentModel);currentModel=null;}
+  if(wireframeOverlay){scene.remove(wireframeOverlay);wireframeOverlay=null;}
+}
+function applyTransform(){
+  if(!currentModel)return;
+  var px=+ge('pos-x').value,py=+ge('pos-y').value,pz=+ge('pos-z').value;
+  var rx=+ge('rot-x').value,ry=+ge('rot-y').value,rz=+ge('rot-z').value;
+  var sx=+ge('sc-x').value,sy=+ge('sc-y').value,sz=+ge('sc-z').value;
+  currentModel.position.set(px,py,pz);
+  currentModel.rotation.set(rx*Math.PI/180,ry*Math.PI/180,rz*Math.PI/180);
+  currentModel.scale.set(sx,sy,sz);
+  ge('v-px').textContent=px.toFixed(2);ge('v-py').textContent=py.toFixed(2);ge('v-pz').textContent=pz.toFixed(2);
+  ge('v-rx').textContent=Math.round(rx)+'°';ge('v-ry').textContent=Math.round(ry)+'°';ge('v-rz').textContent=Math.round(rz)+'°';
+  ge('v-sx').textContent=sx.toFixed(2);ge('v-sy').textContent=sy.toFixed(2);ge('v-sz').textContent=sz.toFixed(2);
+}
+function resetTransform(){
+  ['pos-x','pos-y','pos-z'].forEach(function(i){ge(i).value=0;});
+  ['rot-x','rot-y','rot-z'].forEach(function(i){ge(i).value=0;});
+  ['sc-x','sc-y','sc-z'].forEach(function(i){ge(i).value=1;});
+  applyTransform();
+}
+function centerModel(){
+  if(!currentModel)return;
+  var b=new THREE.Box3().setFromObject(currentModel),c=b.getCenter(new THREE.Vector3());
+  currentModel.position.sub(c);currentModel.position.y=-b.min.y+c.y;
+  ge('pos-x').value=currentModel.position.x.toFixed(2);
+  ge('pos-y').value=currentModel.position.y.toFixed(2);
+  ge('pos-z').value=currentModel.position.z.toFixed(2);
+  applyTransform();toast('centered');
+}
+function frameModel(){
+  if(!currentModel)return;
+  var b=new THREE.Box3().setFromObject(currentModel);
+  var s=b.getSize(new THREE.Vector3()),c=b.getCenter(new THREE.Vector3());
+  var d=(Math.max(s.x,s.y,s.z)/2)/Math.tan(camera.fov*Math.PI/360)*1.9;
+  camera.position.set(c.x+d*.6,c.y+d*.4,c.z+d*.8);
+  controls.target.copy(c);controls.update();
+}
+function applyShading(){
+  if(!currentModel)return;
+  var mode=ge('shade-mode').value;
+  if(wireframeOverlay){scene.remove(wireframeOverlay);wireframeOverlay=null;}
+  currentModel.traverse(function(c){
+    if(!c.isMesh)return;
+    if(mode==='wireframe'){
+      c.material=new THREE.MeshBasicMaterial({color:0xffffff,wireframe:true});
+    } else if(mode==='normals'){
+      c.material=new THREE.MeshNormalMaterial({side:THREE.DoubleSide});
+    } else if(mode==='matcap'){
+      c.material=new THREE.MeshMatCapMaterial({color:0xdddddd});
+    } else {
+      var hasVC=!!(c.geometry&&c.geometry.attributes.color);
+      var mats=Array.isArray(c.material)?c.material:[c.material];
+      var hasMap=mats.some(function(mt){return !!(mt&&mt.map);});
+      var o=+ge('sl-opac').value;
+      if(hasVC){
+        c.material=new THREE.MeshBasicMaterial({vertexColors:true,opacity:o,transparent:o<1,side:THREE.DoubleSide});
+      } else if(hasMap){
+        mats.forEach(function(mt){mt.opacity=o;mt.transparent=o<1;mt.side=THREE.DoubleSide;mt.needsUpdate=true;});
+      } else {
+        var m=+ge('sl-metal').value,r=+ge('sl-rough').value;
+        c.material=new THREE.MeshStandardMaterial({color:new THREE.Color(ge('col-base').value),metalness:m,roughness:r,opacity:o,transparent:o<1,side:THREE.DoubleSide});
+      }
+    }
+    c.material.needsUpdate=true;
+  });
+  if(mode==='wireframe-solid'){
+    wireframeOverlay=currentModel.clone(true);
+    wireframeOverlay.traverse(function(c){
+      if(c.isMesh)c.material=new THREE.MeshBasicMaterial({color:0x1a1a1a,wireframe:true});
+    });
+    scene.add(wireframeOverlay);
+  }
+  ge('h-tl').textContent=mode.replace('-',' ').toUpperCase();
+}
+function applyMaterial(){
+  if(!currentModel)return;
+  var col=ge('col-base').value,emit=ge('col-emit').value;
+  var m=+ge('sl-metal').value,r=+ge('sl-rough').value,o=+ge('sl-opac').value;
+  ge('v-metal').textContent=m.toFixed(2);ge('v-rough').textContent=r.toFixed(2);ge('v-opac').textContent=o.toFixed(2);
+  if(['normals','matcap','wireframe'].includes(ge('shade-mode').value))return;
+  currentModel.traverse(function(c){
+    if(!c.isMesh)return;
+    var hasVC=!!(c.geometry&&c.geometry.attributes.color);
+    (Array.isArray(c.material)?c.material:[c.material]).forEach(function(mt){
+      if(!mt)return;
+      mt.opacity=o;mt.transparent=o<1;
+      if(!hasVC){
+        if(mt.color)mt.color.set(col);
+        if(mt.emissive)mt.emissive.set(emit);
+        if(mt.metalness!==undefined)mt.metalness=m;
+        if(mt.roughness!==undefined)mt.roughness=r;
+      }
+      mt.needsUpdate=true;
+    });
+  });
+}
+function resetMaterial(){
+  ge('col-base').value='#ffffff';ge('col-emit').value='#000000';
+  ge('sl-metal').value=0;ge('sl-rough').value=0.6;ge('sl-opac').value=1;
+  applyMaterial();toast('material reset');
+}
+function applyLightPreset(preset) {
+  var presets = {
+    studio:  { amb: 1.20, key: 1.80, fill: 0.70, bg: '#282828', keyCol: '#fff8f0', fillCol: '#c0d8ff' },
+    outdoor: { amb: 1.20, key: 1.80, fill: 0.60, bg: '#2a3a4a', keyCol: '#fffbe0', fillCol: '#b0d0ff' },
+    dark:    { amb: 0.15, key: 0.60, fill: 0.10, bg: '#000000', keyCol: '#8080ff', fillCol: '#ff4040' },
+    product: { amb: 1.00, key: 0.90, fill: 0.90, bg: '#ffffff', keyCol: '#ffffff', fillCol: '#ffffff' },
+  };
+  var p = presets[preset]; if (!p) return;
+  ge('sl-amb').value  = p.amb;  ge('v-amb').textContent  = p.amb.toFixed(2);
+  ge('sl-key').value  = p.key;  ge('v-key').textContent  = p.key.toFixed(2);
+  ge('sl-fill').value = p.fill; ge('v-fill').textContent = p.fill.toFixed(2);
+  ge('col-key').value  = p.keyCol;
+  ge('col-fill').value = p.fillCol;
+  ge('col-bg').value   = p.bg;
+  applyLighting(); applyScene();
+  toast(preset + ' lighting');
+}
+function applyScene(){
+  scene.background=new THREE.Color(ge('col-bg').value);
+  gridHelper.visible=ge('tog-grid').checked;
+  renderer.shadowMap.enabled=ge('tog-shadow').checked;
+  if(currentModel)currentModel.traverse(function(c){
+    if(c.isMesh){c.castShadow=renderer.shadowMap.enabled;c.receiveShadow=renderer.shadowMap.enabled;}
+  });
+}
+function applyLighting(){
+  ambientLight.intensity=+ge('sl-amb').value;
+  keyLight.intensity=+ge('sl-key').value;
+  fillLight.intensity=+ge('sl-fill').value;
+  keyLight.color.set(ge('col-key').value);
+  fillLight.color.set(ge('col-fill').value);
+  ge('v-amb').textContent=(+ge('sl-amb').value).toFixed(2);
+  ge('v-key').textContent=(+ge('sl-key').value).toFixed(2);
+  ge('v-fill').textContent=(+ge('sl-fill').value).toFixed(2);
+}
+function setView(view,e){
+  document.querySelectorAll('.vb').forEach(function(b){b.classList.remove('active');});
+  if(e&&e.target)e.target.classList.add('active');
+  var d=6,P={front:[0,1,d],back:[0,1,-d],top:[0,d,.001],bottom:[0,-d,.001],left:[-d,1,0],right:[d,1,0],persp:[d*.6,d*.4,d*.8]};
+  camera.position.set.apply(camera.position,P[view]||P.persp);
+  controls.target.set(0,0,0);controls.update();
+  ge('h-tl').textContent=view.toUpperCase();
+}
+function downloadModel(){
+  if(fileData){
+    var a=document.createElement('a');a.href=URL.createObjectURL(fileData);
+    a.download=fileData.name||'model.glb';a.click();
+    toast('downloading…');
+  } else if(_loadedUrl){
+    // Download from server URL
+    var a=document.createElement('a');a.href=_loadedUrl;
+    a.download=_loadedName||'model.glb';a.target='_blank';a.click();
+    toast('downloading…');
+  } else {
+    toast('no model loaded');
+  }
+}
+function toggleFullscreen(){
+  var wrap=ge('viewport-wrap');
+  if(!document.fullscreenElement){
+    (wrap.requestFullscreen||wrap.webkitRequestFullscreen||function(){}).call(wrap);
+    ge('fs-btn').textContent='✕ exit fullscreen';
+  } else {
+    (document.exitFullscreen||document.webkitExitFullscreen||function(){}).call(document);
+    ge('fs-btn').textContent='⛶ fullscreen';
+  }
+}
+function screenshotView(){
+  renderer.render(scene,camera);
+  var a=document.createElement('a');a.href=renderer.domElement.toDataURL('image/png');a.download='trigenix_view.png';a.click();
+  toast('screenshot saved');
+}
+function showLoading(m,p){ge('loading').classList.remove('hidden');setLoadMsg(m,p);}
+function setLoadMsg(m,p){ge('load-msg').textContent=m;ge('load-bar').style.width=p+'%';}
+function hideLoading(){ge('loading').classList.add('hidden');}
+var _tt;
+function toast(m){var el=ge('toast');el.textContent=m;el.classList.add('show');clearTimeout(_tt);_tt=setTimeout(function(){el.classList.remove('show');},2400);}
+
+/* ── Quality Report ─────────────────────────────────────────── */
+function loadQualityReport() {
+  var p = new URLSearchParams(location.search);
+  var modelUrl = p.get('model');
+  if (!modelUrl) return;
+  var baseUrl = modelUrl.substring(0, modelUrl.lastIndexOf('/'));
+  var qrUrl = baseUrl + '/quality_report.json?_v=' + Date.now();
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', qrUrl, true);
+  if (_authToken) xhr.setRequestHeader('Authorization', 'Bearer ' + _authToken);
+  xhr.onload = function() {
+    if (xhr.status !== 200) return;
+    try {
+      var d = JSON.parse(xhr.responseText);
+      var scores = d.scores;
+      if (!scores) return;
+      var cats = ['geometry','surface','topology','texture','completeness','overall'];
+      var html = cats.map(function(k) {
+        var v = scores[k] || 0;
+        var cls = v >= 80 ? 'green' : (v >= 50 ? 'amber' : 'red');
+        return '<div class="qbar-row">' +
+          '<span class="qbar-label">' + k + '</span>' +
+          '<div class="qbar-track"><div class="qbar-fill ' + cls + '" style="width:' + v + '%"></div></div>' +
+          '<span class="qbar-val">' + v + '</span>' +
+          '</div>';
+      }).join('');
+      ge('quality-bars').innerHTML = html;
+      var wt = d.watertight;
+      var badge = ge('wt-badge');
+      if (badge) {
+        badge.textContent = wt ? '✅ Print-ready' : '⚠️ Needs repair';
+        badge.style.color = wt ? '#4ade80' : '#ffd166';
+      }
+      ge('quality-section').style.display = '';
+    } catch(e) {}
+  };
+  xhr.send();
+}
+
+/* ── Confidence / Defect Overlay ────────────────────────────── */
+var _confidenceData = null;
+var _originalColors = null;
+var _defectsActive = false;
+
+function loadConfidenceMap() {
+  var p = new URLSearchParams(location.search);
+  var modelUrl = p.get('model');
+  if (!modelUrl) return;
+  var baseUrl = modelUrl.substring(0, modelUrl.lastIndexOf('/'));
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', baseUrl + '/confidence_map.json?_v=' + Date.now(), true);
+  if (_authToken) xhr.setRequestHeader('Authorization', 'Bearer ' + _authToken);
+  xhr.onload = function() {
+    if (xhr.status !== 200) return;
+    try {
+      _confidenceData = JSON.parse(xhr.responseText).vertex_confidence;
+      if (_confidenceData && _confidenceData.length > 0) {
+        var btn = ge('btn-defects');
+        if (btn) btn.style.display = '';
+      }
+    } catch(e) {}
+  };
+  xhr.send();
+}
+
+function toggleDefects() {
+  if (!currentModel || !_confidenceData) return;
+  _defectsActive = !_defectsActive;
+  var btn = ge('btn-defects');
+  if (btn) btn.textContent = _defectsActive ? 'Hide Defects' : 'Show Defects';
+  currentModel.traverse(function(c) {
+    if (!c.isMesh || !c.geometry) return;
+    var pos = c.geometry.attributes.position;
+    if (!pos) return;
+    var nv = pos.count;
+    if (_defectsActive) {
+      var origVC = c.geometry.attributes.color;
+      _originalColors = origVC ? new Float32Array(origVC.array) : null;
+      var colors = new Float32Array(nv * 3);
+      for (var i = 0; i < nv; i++) {
+        var conf = (_confidenceData[i] !== undefined) ? _confidenceData[i] : 1.0;
+        colors[i*3]   = 1.0 - conf;
+        colors[i*3+1] = conf * 0.5;
+        colors[i*3+2] = conf * 0.5;
+      }
+      c.geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      c.material = new THREE.MeshBasicMaterial({vertexColors: true, side: THREE.DoubleSide});
+    } else {
+      if (_originalColors && c.geometry.attributes.color) {
+        c.geometry.attributes.color.array.set(_originalColors);
+        c.geometry.attributes.color.needsUpdate = true;
+      }
+      c.material = new THREE.MeshBasicMaterial({vertexColors: true, side: THREE.DoubleSide});
+    }
+    c.material.needsUpdate = true;
+  });
+}
+
+/* ── Measurement Tool ───────────────────────────────────────── */
+var _measureMode = false;
+var _measurePoints = [];
+var _measureMarkers = [];
+var _measureLine = null;
+
+function toggleMeasure() {
+  _measureMode = !_measureMode;
+  var btn = ge('measure-btn');
+  if (btn) {
+    btn.style.background  = _measureMode ? 'rgba(105,216,182,.2)' : '';
+    btn.style.borderColor = _measureMode ? '#69d8b6' : '';
+    btn.style.color       = _measureMode ? '#69d8b6' : '';
+  }
+  ge('three-canvas').style.cursor = _measureMode ? 'crosshair' : '';
+  if (!_measureMode) clearMeasure();
+}
+
+function clearMeasure() {
+  _measurePoints = [];
+  _measureMarkers.forEach(function(m) { scene.remove(m); });
+  _measureMarkers = [];
+  if (_measureLine) { scene.remove(_measureLine); _measureLine = null; }
+  var info = ge('measure-info');
+  if (info) info.textContent = '';
+}
+
+/* Measurement click handler is attached after canvas exists, inside initApp() setup */
+function _onMeasureClick(e) {
+  if (!_measureMode || !currentModel) return;
+  var canvas = ge('three-canvas');
+  var rect = canvas.getBoundingClientRect();
+  var mouse = new THREE.Vector2(
+    ((e.clientX - rect.left) / rect.width)  *  2 - 1,
+    ((e.clientY - rect.top)  / rect.height) * -2 + 1
+  );
+  var raycaster = new THREE.Raycaster();
+  raycaster.setFromCamera(mouse, camera);
+  var hits = raycaster.intersectObject(currentModel, true);
+  if (!hits.length) return;
+  var pt = hits[0].point.clone();
+  if (_measurePoints.length >= 2) clearMeasure();
+  _measurePoints.push(pt);
+  var modelBox = new THREE.Box3().setFromObject(currentModel);
+  var modelSize = modelBox.getSize(new THREE.Vector3()).length();
+  var sph = new THREE.Mesh(
+    new THREE.SphereGeometry(modelSize * 0.008, 8, 8),
+    new THREE.MeshBasicMaterial({color: 0x69d8b6})
+  );
+  sph.position.copy(pt);
+  scene.add(sph);
+  _measureMarkers.push(sph);
+  if (_measurePoints.length === 2) {
+    var geo = new THREE.BufferGeometry().setFromPoints(_measurePoints);
+    _measureLine = new THREE.Line(geo, new THREE.LineDashedMaterial({color:0x69d8b6,dashSize:.02,gapSize:.01}));
+    _measureLine.computeLineDistances();
+    scene.add(_measureLine);
+    var dist = _measurePoints[0].distanceTo(_measurePoints[1]);
+    var info = ge('measure-info');
+    if (info) info.textContent = '📏 ' + dist.toPrecision(4) + ' units';
+  }
+}
+
+/* ── UV Texture Toggle ──────────────────────────────────────── */
+var _uvModelUrl = null;
+var _vcModelUrl = null;
+var _uvActive   = false;
+
+function checkUVAvailable() {
+  var p = new URLSearchParams(location.search);
+  var modelUrl = p.get('model');
+  if (!modelUrl) return;
+  var baseUrl = modelUrl.substring(0, modelUrl.lastIndexOf('/'));
+  var uvUrl = baseUrl + '/model_uv_textured.glb';
+  var xhr = new XMLHttpRequest();
+  xhr.open('HEAD', uvUrl, true);
+  if (_authToken) xhr.setRequestHeader('Authorization', 'Bearer ' + _authToken);
+  xhr.onload = function() {
+    if (xhr.status === 200) {
+      _uvModelUrl = uvUrl;
+      _vcModelUrl = modelUrl;
+      var btn = ge('uv-toggle-btn');
+      if (btn) btn.style.display = '';
+    }
+  };
+  xhr.send();
+}
+
+function toggleUVMode() {
+  _uvActive = !_uvActive;
+  var btn = ge('uv-toggle-btn');
+  if (btn) btn.textContent = _uvActive ? 'Vert Colors' : 'UV Tex';
+  var target = _uvActive ? _uvModelUrl : _vcModelUrl;
+  if (target) loadFromURL(target, _uvActive ? 'model_uv_textured.glb' : 'model.glb');
+}
+
+initApp();
+</script>
+</body>
+</html>

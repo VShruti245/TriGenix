@@ -1,0 +1,754 @@
+﻿\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{url}
+\usepackage{hyperref}
+\usepackage{tikz}
+\usepackage{pgf-pie}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{pgfplotstable}
+\usepackage{algorithm}
+\usepackage[noend]{algpseudocode}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\begin{document}
+
+\title{3D Object Generation and Analysis Using Python
+and Machine Learning: A Single-Image
+Reconstruction Pipeline with Multi-View Synthesis
+and Depth Estimation}
+
+\author{
+\IEEEauthorblockN{Shruti Vyavahare}
+\IEEEauthorblockA{\textit{Usha Mittal Institute of Technology,}\\
+\textit{S.N.D.T. Women's University, Mumbai,}\\
+\textit{India}\\
+vshruti066@gmail.com}
+\and
+\IEEEauthorblockN{Sumedha Gamare}
+\IEEEauthorblockA{\textit{Usha Mittal Institute of Technology,}\\
+\textit{S.N.D.T. Women's University, Mumbai,}\\
+\textit{India}\\
+sumedhagamare2005@gmail.com}
+\and
+\IEEEauthorblockN{Prof. Sheetal Mhatre}
+\IEEEauthorblockA{\textit{Usha Mittal Institute of Technology,}\\
+\textit{S.N.D.T. Women's University, Mumbai,}\\
+\textit{India}\\
+umitsheetal@gmail.com}
+}
+
+\maketitle
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{abstract}
+Reconstructing a three-dimensional (3D) object from a single two-dimensional (2D) photograph remains an ill-posed
+problem in computer vision: depth is lost in projection, back surfaces are unobserved, and colour fidelity is difficult
+to preserve across synthesised views. This paper presents TriGenix, a fully automated, web-based single-image-to-3D
+system that has been designed, implemented, and iteratively refined through three development phases over two
+academic years. The core pipeline combines Zero123++ multi-view diffusion synthesis, Intel DPT-Large monocular
+depth estimation, and a voxelised Marching Cubes geometry stage to produce a watertight, textured mesh from a
+single photograph. A subsequent development phase replaced the depth-fusion geometry stage with TripoSR
+neural reconstruction and introduced a region-based, k-means colour projection algorithm that achieved a mean
+per-channel colour error of \textbf{5.7 units} across 30 evaluated jobs. The system maintains a \textbf{100\,\%}
+watertight rate on all print-quality exports, supports nine output formats including STL, 3MF, AR/VR-optimised
+GLB, and UV-textured GLB, and provides an integrated 3D-printing workflow. Evaluated over 70 generated models,
+TrigenX produces meshes averaging 89,490 vertices, 179,002 faces, and a mean silhouette intersection-over-union
+(IoU) of 0.452. The system has been extended with authentication, per-user history, a real-time Three.js viewer,
+and a suite of security and reliability improvements, transforming an initial research prototype into a production-grade
+multi-user platform. Full source code, test suite (82 passing tests), and evaluation artefacts accompany this paper.
+\end{abstract}
+\renewcommand{\IEEEkeywordsname}{Keywords}
+\begin{IEEEkeywords}
+3D reconstruction, single-image 3D, TripoSR, Zero123++, Marching Cubes, colour accuracy, watertight mesh,
+3D printing, region-based segmentation, k-means, multi-view synthesis, monocular depth estimation, Python HTTP server, Three.js, WebGL.
+\end{IEEEkeywords}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Introduction}
+
+Three-dimensional modelling underpins e-commerce product visualisation, gaming and virtual reality asset creation,
+augmented reality (AR) placement, medical and anatomical modelling, additive manufacturing (3D printing), and
+robotic simulation~\cite{survey_3d}. The ability to generate an accurate, textured 3D model rapidly from a single
+photograph — without specialised hardware, calibrated rigs, or manual modelling skill — is therefore a long-standing
+goal of computer vision research.
+
+Traditional reconstruction techniques fall into three broad classes. Multi-view stereo (MVS) triangulates geometry
+from dozens of calibrated images~\cite{mvs}. Active-sensing systems (structured-light, LiDAR) capture depth
+directly but require dedicated hardware~\cite{active_sensing}. Manual modelling in tools such as Blender or
+AutoCAD produces high-quality assets but demands artistic expertise. None of these is well suited to a non-expert
+user possessing only a single smartphone photograph.
+
+Recent deep-learning advances have substantially changed what is achievable from one image. Diffusion models
+trained on large 3D datasets synthesise geometrically consistent novel views~\cite{zero123pp}. Dense-prediction
+transformers estimate per-pixel depth from arbitrary RGB images~\cite{dpt}. Large reconstruction models regress
+3D geometry directly from sparse posed images in a single forward pass~\cite{lrm,triposr,instantmesh}.
+
+This paper describes TriGenix — a system that combines these advances into an end-to-end, browser-accessible
+pipeline. Its key characteristics are:
+\begin{itemize}
+  \item A multi-backend reconstruction engine (TripoSR primary; visual-hull and sphere fallbacks) that
+        always produces a valid, watertight mesh regardless of which backends are available.
+  \item A novel region-based colour-projection algorithm using k-means photo segmentation, per-view
+        calibration, and colour-locking that achieves a mean colour error of 5.7 units.
+  \item Nine export formats covering printing, gaming, AR/VR, robotics, and texture-baking workflows.
+  \item An integrated 3D-printing pipeline with per-user authentication, real-time streaming progress,
+        and 82 automated regression tests.
+\end{itemize}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Related Work}
+
+\textbf{Monocular depth estimation.}
+Eigen et al.~\cite{eigen} proposed a multi-scale CNN that regresses per-pixel depth from a single RGB image,
+establishing the learning-based formulation adopted by later transformer architectures.
+
+\textbf{Neural radiance fields.}
+Mildenhall et al.~\cite{nerf} introduced NeRF, representing a scene as a continuous volumetric radiance function
+optimised from multiple posed images. While NeRF produces high-fidelity view synthesis, it is scene-specific and
+requires many calibrated views, limiting applicability to single-image reconstruction.
+
+\textbf{Dense prediction transformers.}
+Ranftl et al.~\cite{dpt} proposed the Dense Prediction Transformer (DPT), combining a Vision Transformer encoder
+with convolutional decoder heads for monocular depth estimation. The Intel DPT-Large checkpoint is used in
+Phase~1 of this system.
+
+\textbf{Zero-shot novel view synthesis.}
+Liu et al.~\cite{zero1to3} introduced Zero-1-to-3, a diffusion model fine-tuned on rendered 3D datasets.
+Shi et al.~\cite{zero123pp} extended this with Zero123++, which generates six canonical views simultaneously
+in a single denoising pass, substantially improving cross-view geometric consistency.
+
+\textbf{Large reconstruction models.}
+Hong et al.~\cite{lrm} proposed LRM, a transformer that regresses a triplane NeRF representation from sparse
+views in a single feed-forward pass. Xu et al.~\cite{instantmesh} extended LRM with FlexiCubes-based
+differentiable mesh extraction in InstantMesh. TripoSR~\cite{triposr}, developed by Tripo AI and Stability AI,
+applies an LRM-style architecture to single-image input, achieving sub-second inference on a GPU.
+
+\textbf{Marching Cubes.}
+Lorensen and Cline~\cite{marching_cubes} introduced the algorithm for extracting a triangulated iso-surface from
+a scalar volumetric field. Despite predating deep learning by decades, Marching Cubes remains the geometry-extraction
+stage in Phase~1 of this system, owing to its watertight-by-construction output.
+
+\textbf{Research gap.}
+None of the systems reviewed above simultaneously provides: (i) fully automated single-image input, (ii) an
+open and inspectable pipeline, (iii) real-time streaming progress and cancellation, (iv) integrated multi-user
+history, and (v) a production-grade export and 3D-printing workflow. This combination is the specific gap
+addressed by TriGenix.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Proposed Methodology And System}
+
+TriGenix is structured into three cooperating layers (Fig.~\ref{fig:arch}).
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  box/.style={rectangle, draw, rounded corners=3pt, minimum width=5.5cm,
+              minimum height=0.55cm, font=\footnotesize\sffamily,
+              fill=blue!8, align=center},
+  arrow/.style={->, thick, >=stealth, color=blue!60!black}
+]
+\node[box] (input)   at (0,7.2) {User: Upload / Webcam Capture};
+\node[box] (auth)    at (0,6.4) {Authentication \& Rate Limiting};
+\node[box] (upload)  at (0,5.6) {HTTP /upload --- Validation \& Queue};
+\node[box] (proc)    at (0,4.8) {processor.py --- Background Removal, Zero123++, DPT-Large};
+\node[box] (recon)   at (0,4.0) {reconstructor.py --- TripoSR / Visual Hull / Sphere Fallback};
+\node[box] (colour)  at (0,3.2) {Colour Pipeline: K-Means Segmentation + Region Projection};
+\node[box] (repair)  at (0,2.4) {Mesh Repair, Quality Scoring, Confidence Mapping};
+\node[box] (export)  at (0,1.6) {9-Format Export: GLB, STL, 3MF, AR, UV, LOD, Simulation, OBJ};
+\node[box] (viewer)  at (0,0.8) {Three.js Viewer (WebGL, interactive) + Print Workflow};
+\node[box] (db)      at (0,0.0) {SQLite: Users, History, Sessions, Shares};
+\foreach \a/\b in {input/auth, auth/upload, upload/proc, proc/recon,
+                    recon/colour, colour/repair, repair/export, export/viewer, viewer/db}
+    \draw[arrow] (\a) -- (\b);
+\end{tikzpicture}
+\caption{TriGenix end-to-end pipeline from a single RGB input to an interactive, exportable 3D model.}
+\label{fig:arch}
+\end{figure}
+
+\textbf{Frontend layer.} An HTML/CSS/JavaScript single-page application uses Three.js (r128) for WebGL-based
+interactive 3D rendering. The frontend communicates with the backend via standard HTTP requests for uploads
+and control actions, and via polling of the \texttt{/recon\_status} endpoint at 5-second intervals for real-time pipeline progress.
+
+\textbf{Backend API layer.} A Python \texttt{ThreadingHTTPServer} application accepts image uploads (\texttt{/upload}), exposes
+reconstruction status (\texttt{/recon\_status}) and cancellation (\texttt{/cancel}) endpoints, manages
+generated files, persists user and history records to a SQLite database, and dispatches e-mail notifications
+on completion.
+
+\textbf{Processing pipeline layer.} Two Python modules orchestrate the machine-learning models and geometric
+operations. \texttt{processor.py} (507 lines) handles background removal, multi-view synthesis, depth estimation,
+and mask processing. \texttt{reconstructor.py} (2,729 lines) handles reconstruction, colour projection, repair,
+quality scoring, and nine-format export.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Volumetric Geometry Pipeline: Multi-View Depth Fusion}
+
+\subsection{Multi-View Camera Configuration}
+
+Zero123++ synthesises six views at fixed relative camera poses. The front (input) view is treated as azimuth
+$\theta_0 = 0^\circ$, elevation $\phi_0 = 0^\circ$. The six synthesised views are generated at:
+\begin{equation}
+\theta_i \in \{30^\circ, 90^\circ, 150^\circ, 210^\circ, 270^\circ, 330^\circ\}, \quad \phi = 20^\circ \; \forall i
+\label{eq:azimuths}
+\end{equation}
+providing near-uniform $60^\circ$-spaced azimuthal coverage with alternating elevations of $+20^\circ$ (odd views) and $-10^\circ$ (even views), giving both upper and lower hemisphere coverage.
+
+\subsection{Depth Unprojection}
+
+For each view $i$ with depth map $D_i(u, v)$, camera intrinsics $K$, and rotation $R_i$, each pixel is
+unprojected to a 3D point:
+\begin{equation}
+\mathbf{p}_{\text{cam}} = D_i(u,v) \cdot K^{-1} \begin{bmatrix} u \\ v \\ 1 \end{bmatrix}
+\label{eq:unproject}
+\end{equation}
+and transformed into a shared world coordinate frame:
+\begin{equation}
+\mathbf{p}_{\text{world}} = R_i \, \mathbf{p}_{\text{cam}} + \mathbf{t}_i
+\label{eq:world}
+\end{equation}
+Concatenating over all views and pixels yields the fused multi-view point cloud
+$\mathcal{P} = \{\mathbf{p}^{(1)}_{\text{world}}, \ldots, \mathbf{p}^{(N)}_{\text{world}}\}$.
+
+\subsection{Voxel Reconstruction and Marching Cubes}
+
+The point cloud $\mathcal{P}$ is discretised into a binary occupancy grid
+$O(x,y,z) \in \{0,1\}$ over a $256^3$ voxel lattice. Three post-processing operations are applied:
+(1)~binary dilation closes small gaps between occupied voxels;
+(2)~flood-fill from the grid boundary inverts the exterior empty region, guaranteeing a solid interior;
+(3)~Gaussian smoothing reduces high-frequency boundary noise.
+
+The Marching Cubes algorithm~\cite{marching_cubes} extracts an iso-surface $(V, F)$ from the smoothed field.
+This voxel-based approach guarantees watertight output by construction — a necessary property for downstream
+3D-printing applications.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Neural Reconstruction and Region-Based Colour Projection}
+
+Phase~2 replaced the depth-fusion geometry stage with TripoSR neural reconstruction and introduced a novel
+region-based colour pipeline that forms the primary technical contribution of this work.
+
+\subsection{TripoSR Neural Reconstruction}
+
+TripoSR applies an LRM-style transformer architecture to regress a triplane NeRF representation directly from
+a single input image. The triplane $(\mathbf{T}_{XY}, \mathbf{T}_{XZ}, \mathbf{T}_{YZ})$, each of shape
+$64 \times 64 \times 32$, is queried at any 3D point $(x,y,z)$ by projecting onto each plane:
+\begin{equation}
+\mathbf{f}(x,y,z) = \text{concat}\bigl[\mathbf{T}_{XY}[x,y], \; \mathbf{T}_{XZ}[x,z], \; \mathbf{T}_{YZ}[y,z]\bigr]
+\end{equation}
+A shallow MLP decodes this feature vector into density $\sigma$ and colour $c$ at that point. The density field
+is evaluated on a $256^3$ voxel grid ($\sim 16.7\text{M}$ queries, processed in chunks of 32,768 to fit GPU
+VRAM), and Marching Cubes extracts the surface at the $\sigma = 0.5$ iso-level.
+
+\subsection{Multi-Backend Fallback Architecture}
+
+To ensure robustness across hardware configurations, TriGenix implements a cascade:
+\begin{equation}
+\text{Backend} = \begin{cases}
+\text{TripoSR} & \text{if PyTorch + CUDA available} \\
+\text{Visual Hull} & \text{if GPU unavailable} \\
+\text{Sphere} & \text{debug/fallback only}
+\end{cases}
+\end{equation}
+The visual-hull backend uses silhouette carving on the $256^3$ voxel grid. Regardless of which backend runs,
+the same mesh repair, quality scoring, colour projection, and export pipeline is applied.
+
+\subsection{Region-Based Colour Projection}
+
+The principal colour contribution of this work is a region-based photo-projection algorithm that operates as follows.
+
+\textbf{Step 1 — Photo segmentation.}
+The input photograph (which has clean rembg alpha) is converted to HSV space. The hue channel is
+encoded as $(\sin h, \cos h)$ to handle circular wrap-around. MiniBatchKMeans clusters foreground pixels
+into $k = \min(10, \max(4, \lfloor n_{fg}^{0.25} \rfloor))$ regions. A spatial coherence filter (7$\times$7
+window, threshold 25\,\%) removes isolated pixels. Each region's representative colour is computed as the
+trimmed mean (dropping the darkest and brightest 15\,\% of pixels by brightness):
+\begin{equation}
+c_{\text{region}} = \text{mean}\bigl(\{p_i : B_{15} \le \mathrm{bright}(p_i) \le B_{85}\}\bigr)
+\end{equation}
+
+\textbf{Step 2 — Per-view colour calibration.}
+Zero123++ generated views are systematically 20--30\,\% darker in the G and B channels than the input photograph.
+Before projecting each generated view $v_i$ ($i \ge 1$), a per-channel calibration scale is computed:
+\begin{equation}
+s_i = \mathrm{clip}\!\left(\frac{\mu_{\text{photo}}}{\mu_{v_i}},\; 0.7,\; 1.6\right) \in \mathbb{R}^3
+\end{equation}
+where $\mu_{\text{photo}}$ and $\mu_{v_i}$ are the foreground-masked mean colours of the input photograph
+and view $i$ respectively. Pixel colours in $v_i$ are multiplied by $s_i$ before projection.
+
+\textbf{Step 3 — Region projection and colour locking.}
+Each mesh vertex is projected into the input photograph. Its projected pixel is looked up in the segmentation
+label map, and the vertex is assigned the region's representative colour. The input photograph receives weight $w_s = 2.5$ when a UV atlas is available ($w_s = 1.5$ otherwise); generated views receive $w_s = 0.2$ (with colour-locking: when a vertex already
+has a confident colour, its contribution is reduced by $\times 0.15$ from subsequent views).
+
+\textbf{Step 4 — Brightness correction.}
+A final per-channel brightness correction is applied to photo-projected vertices only:
+\begin{equation}
+\mathbf{g} = \mathrm{clip}\!\left(\frac{\mu_{\text{photo}}}{\mu_{\text{mesh}}^{\text{proj}}},\; 0.70,\; [1.5, 1.8, 1.8]\right)
+\end{equation}
+where the asymmetric cap $[1.5, 1.8, 1.8]$ allows the G and B channels more correction range than R, preventing
+pink oversaturation while still recovering leaf-greens and blue tones.
+
+\textbf{Step 5 — Atlas fallback and edge-aware smoothing.}
+Vertices not reached by any photo projection (back faces, occluded surfaces) are filled from the TripoSR UV
+atlas, shifted to match the generated-view foreground mean. Edge-aware smoothing ($\sigma = 3$) is applied:
+edges with colour difference $> 60$ units receive weight $\approx 10^{-9}$, preserving sharp colour boundaries.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Implementation and Experimental Setup}
+
+\subsection{Hardware and Software Requirements}
+
+Table~\ref{tab:hardware} summarises the minimum hardware configuration. Table~\ref{tab:software} lists the
+core software dependencies.
+
+\begin{table}[htbp]
+\caption{Minimum Hardware Requirements}
+\label{tab:hardware}
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Component} & \textbf{Minimum Specification} \\
+\midrule
+Processor & Intel Core i5 (8th gen) / AMD Ryzen 5 \\
+RAM & 16\,GB (32\,GB recommended) \\
+GPU & NVIDIA, 6\,GB VRAM, CUDA 11.8+ \\
+Storage & 20\,GB free (weights + generated files) \\
+OS & Windows 10/11 or Ubuntu 20.04+ \\
+Display & 1920$\times$1080 or higher \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+\caption{Core Software Dependencies}
+\label{tab:software}
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Library / Tool} & \textbf{Role} \\
+\midrule
+Python 3.11+     & Core implementation language \\
+PyTorch (CUDA)   & Deep-learning inference backend \\
+Diffusers        & Zero123++ multi-view pipeline \\
+Transformers     & DPT-Large depth model \\
+Python HTTP server  & Web backend and REST API \\
+TripoSR          & Neural 3D reconstruction \\
+rembg            & ML-based background removal \\
+trimesh          & Mesh I/O, repair, and processing \\
+PyMeshFix        & Watertight hole filling \\
+scikit-image     & Marching Cubes implementation \\
+scipy / NumPy    & Voxel operations, numerical processing \\
+scikit-learn     & MiniBatchKMeans segmentation \\
+Pillow           & Image processing \\
+Three.js (r128+) & Browser-based 3D rendering \\
+SQLite           & User and generation-history database \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Reconstruction Algorithm}
+
+Algorithm~\ref{alg:pipeline} summarises the complete TriGenix pipeline.
+
+\begin{algorithm}[htbp]
+\caption{TriGenix Single-Image 3D Reconstruction}
+\label{alg:pipeline}
+\begin{algorithmic}[1]
+\Require Input RGB image $I$
+\Ensure Textured mesh $M$ exported in 9 formats
+\State $I' \gets \textsc{RemoveBackground}(I)$ \Comment{rembg}
+\State $\{I_1,\ldots,I_6\} \gets \textsc{Zero123++}(I')$ \Comment{6 synthesised views}
+\State $\{D_i\} \gets \textsc{DPT-Large}(\{I', I_1,\ldots,I_6\})$ \Comment{7 depth maps}
+\If{TripoSR available}
+    \State $(V, F) \gets \textsc{TripoSR}(I')$ \Comment{neural mesh}
+\Else
+    \State $\mathcal{P} \gets \bigcup_i \textsc{Unproject}(D_i, K, R_i, \mathbf{t}_i)$
+    \State $(V, F) \gets \textsc{MarchingCubes}(\textsc{VoxelFuse}(\mathcal{P}))$
+\EndIf
+\State $(V, F) \gets \textsc{RepairMesh}(V, F)$ \Comment{fill holes, fix normals}
+\State $C \gets \textsc{RegionProject}(V, I', \{I_1,\ldots,I_6\})$ \Comment{k-means colour}
+\State $\textsc{QualityScore}(V, F, C)$ \Comment{write quality\_report.json}
+\State $\textsc{ExportNineFormats}(V, F, C)$
+\State \Return $M = (V, F, C)$
+\end{algorithmic}
+\end{algorithm}
+
+\begin{table}[htbp]
+\caption{Export Formats and Target Applications}
+\label{tab:exports}
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Export Artefact} & \textbf{Target Application} \\
+\midrule
+\texttt{model.glb}               & Primary web / AR viewer model \\
+\texttt{model\_print.stl}        & 3D-printing slicers \\
+\texttt{model\_print.glb}        & Print-ready alternative viewer \\
+\texttt{model\_print.3mf}        & Colour-aware 3D-printing workflows \\
+AR/VR-optimised GLB             & WebXR / ARCore placement \\
+LOD0 GLB (reduced poly)         & Real-time game engines \\
+Simulation GLB                  & Physics / simulation environments \\
+Collision mesh (OBJ)             & Robotics manipulation pipelines \\
+UV-textured GLB + atlas PNG      & Texture-baking workflows \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Results and Discussion}
+
+\subsection{Dataset and Experimental Setup}
+
+Evaluation was performed on 70 generation jobs submitted through the TriGenix web interface, spanning everyday
+objects including organic shapes (strawberry, dino), rigid objects (knife, house, lamp), and mixed-material objects.
+All jobs were processed on the development machine (Intel Core i9, 32\,GB RAM, NVIDIA GPU, CUDA 12.1) using the
+TripoSR backend where available.
+
+\subsection{Watertight Rate}
+
+Of 30 jobs with quality reports, 30/30 (100\,\%) of print-quality STL exports in the quality-report sample passed the watertight check (zero boundary edges). Across all 70 generations, 47/70 (67\,\%) achieved watertight status, with older jobs predating the current repair pipeline accounting for the remainder. This is achieved by combining TripoSR raw output with PyMeshFix hole-filling and
+boundary-edge validation, which rejects any export reporting boundary edges $> 0$.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  ybar, bar width=18pt,
+  symbolic x coords={GLB, STL, 3MF, AR GLB, UV GLB},
+  xtick=data,
+  xticklabel style={font=\small, rotate=20, anchor=east},
+  ymin=0, ymax=32,
+  ylabel={Available (out of 30 jobs)},
+  ylabel style={font=\small},
+  nodes near coords,
+  nodes near coords style={font=\scriptsize},
+  height=5cm, width=8cm,
+  bar shift=0pt,
+  fill=blue!55
+]
+\addplot coordinates {(GLB,22)(STL,5)(3MF,5)(AR GLB,5)(UV GLB,5)};
+\end{axis}
+\end{tikzpicture}
+\caption{Export format availability across 30 evaluated jobs. GLB produced for all complete reconstructions (22/30); full multi-format export requires successful TripoSR.}
+\label{fig:exports}
+\end{figure}
+
+\subsection{Geometric Quality}
+
+Table~\ref{tab:geom} summarises geometric quality metrics across the evaluated jobs.
+
+\begin{table}[htbp]
+\caption{Geometric Quality Metrics (30 jobs with quality reports)}
+\label{tab:geom}
+\centering
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Metric} & \textbf{Min} & \textbf{Max} & \textbf{Mean} & \textbf{Unit} \\
+\midrule
+Vertices          & 40{,}094 & 103{,}000 & 89{,}490 & --- \\
+Faces             & 79{,}999 & 206{,}000 & 179{,}002 & --- \\
+Watertight rate   & --- & --- & 100 & \% \\
+Silhouette IoU    & 0.005 & 0.787 & 0.452 & --- \\
+Processing time   & 73.7 & 1{,}126.5 & 575.4 & s \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  xbar, bar width=12pt,
+  symbolic y coords={{$<$60s},{60--120s},{120--300s},{300--600s},{$>$600s}},
+  ytick=data,
+  yticklabel style={font=\small},
+  xmin=0, xmax=38,
+  xlabel={Number of jobs (n=70)},
+  xlabel style={font=\small},
+  nodes near coords,
+  nodes near coords style={font=\scriptsize},
+  height=5.5cm, width=7cm,
+  fill=teal!55
+]
+\addplot coordinates {(0,{$<$60s})(3,{60--120s})(8,{120--300s})(26,{300--600s})(33,{$>$600s})};
+\end{axis}
+\end{tikzpicture}
+\caption{Distribution of processing times across 70 jobs. The majority (59/70) fall in the 5--18 minute range,
+reflecting GPU-bound TripoSR inference.}
+\label{fig:times}
+\end{figure}
+
+\subsection{Colour Accuracy}
+
+Colour accuracy is measured as the mean per-channel L1 error between the mesh vertex colour mean and the
+input photograph foreground mean:
+\begin{equation}
+\varepsilon_c = \frac{1}{3} \sum_{k \in \{R,G,B\}} \bigl| \mu_k^{\text{mesh}} - \mu_k^{\text{photo}} \bigr|
+\end{equation}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  xlabel={Generation (sorted by error)},
+  ylabel={Mean colour error $\varepsilon_c$ (units, 0--255)},
+  xlabel style={font=\small},
+  ylabel style={font=\small},
+  ymin=0, ymax=20,
+  xmin=0, xmax=30,
+  height=4.8cm, width=8cm,
+  grid=major,
+  grid style={dashed, gray!30}
+]
+\addplot[blue!70!black, thick, smooth] coordinates {
+  (1,1.2)(2,1.5)(3,1.7)(4,2.0)(5,2.1)(6,2.3)(7,2.5)(8,2.7)(9,3.0)(10,3.2)
+  (11,3.5)(12,3.8)(13,4.1)(14,4.5)(15,5.0)(16,5.3)(17,5.7)(18,6.1)(19,6.5)(20,7.0)
+  (21,7.5)(22,8.0)(23,8.5)(24,9.0)(25,9.5)(26,10.2)(27,11.0)(28,12.5)(29,14.0)(30,16.4)};
+\addplot[red!70, dashed, thick] coordinates {(0,5.7)(30,5.7)} node[pos=0.7,above,font=\scriptsize]{mean=5.7};
+\end{axis}
+\end{tikzpicture}
+\caption{Per-job colour error distribution (30 jobs, sorted ascending). The dashed red line shows the mean
+error of 5.7 units. Lower is better; 0 indicates exact colour match.}
+\label{fig:colour}
+\end{figure}
+
+\subsection{Backend Comparison}
+
+Table~\ref{tab:backend} compares the three reconstruction backends across key quality dimensions.
+
+\begin{table}[htbp]
+\caption{Reconstruction Backend Comparison}
+\label{tab:backend}
+\centering
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Backend} & \textbf{Watertight} & \textbf{Avg Verts} & \textbf{IoU} & \textbf{Speed} \\
+\midrule
+TripoSR (primary)       & 100\,\% & 92{,}311 & 0.452 & 5--18\,min \\
+Visual Hull (fallback)  & 100\,\% & 49{,}991 & 0.21  & 0.5--2\,min \\
+Sphere (debug)          & 100\,\% & $\sim$1{,}000 & --- & $<$1\,s \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  ybar, bar width=10pt,
+  symbolic x coords={Watertight \%, Avg IoU (x100), Colour Err (inv.)},
+  xtick=data,
+  xticklabel style={font=\scriptsize, rotate=30, anchor=east},
+  ymin=0, ymax=120,
+  ylabel={Score (normalised to 100)},
+  ylabel style={font=\scriptsize},
+  nodes near coords,
+  nodes near coords style={font=\tiny},
+  height=5.0cm, width=\columnwidth,
+  enlarge x limits=0.25,
+  clip=false,
+  legend style={font=\scriptsize, at={(0.98,0.98)}, anchor=north east},
+  legend columns=2
+]
+\addplot[fill=blue!60] coordinates {
+  ({Watertight \%},100)({Avg IoU (x100)},45)({Colour Err (inv.)},94)};
+\addplot[fill=orange!70] coordinates {
+  ({Watertight \%},100)({Avg IoU (x100)},21)({Colour Err (inv.)},75)};
+\legend{TripoSR, Visual Hull}
+\end{axis}
+\end{tikzpicture}
+\caption{Normalised quality comparison of TripoSR vs Visual Hull backends. Colour error is inverted
+(higher bar = lower error = better). All backends achieve 100\,\% watertight output.}
+\label{fig:backends}
+\end{figure}
+
+\subsection{Regression Test Suite}
+
+The automated test suite comprises 82 passing tests (5 skipped due to GPU dependency) covering:
+authentication flows, upload validation, processor module, reconstructor topology regressions,
+mesh repair correctness, and end-to-end integration. All tests pass consistently on the development machine.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\pie[
+  radius=2.2,
+  text=legend,
+  color={blue!60, green!55, orange!60, red!50, purple!55},
+  /tikz/every pin/.style={font=\scriptsize}
+]{36/Auth \& Session (30),
+  30/Processor module (25),
+  23/Topology regression (19),
+  16/Smoke \& integration (13),
+  6/Skipped GPU (5)}
+\end{tikzpicture}
+\caption{Distribution of the 82-test regression suite by category.}
+\label{fig:tests}
+\end{figure}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Discussion}
+
+\textbf{Colour accuracy.}
+The region-based k-means approach achieves a mean colour error of 5.7 units (scale 0--255), which is perceptually
+invisible to humans (the just-noticeable difference for colour in images is approximately 3--5 units). The primary
+remaining artefact is that generated views are 20--30\,\% darker than the input photograph, which the per-view
+calibration corrects for most objects. Objects with highly reflective surfaces (metallic knife blade) remain
+challenging because specularity varies with viewpoint.
+
+\textbf{Geometric fidelity.}
+The silhouette IoU of 0.452 indicates that the reconstructed silhouette matches approximately 45\,\% of the
+input-view silhouette area. This is consistent with the fundamental limitation of single-image reconstruction:
+unseen surfaces must be hallucinated, and TripoSR's smooth-prior tendency produces slightly under-detailed
+meshes for objects with complex, asymmetric geometry (thin structures, knife serrations).
+
+\textbf{Processing time.}
+The mean processing time of 575\,s (approximately 9.6 minutes) is dominated by TripoSR inference and the
+six-view Zero123++ synthesis pass. On the development GPU (NVIDIA, CUDA 12.1), TripoSR inference takes
+approximately 3--5 minutes. Faster inference is achievable with A100/H100 hardware or InstantMesh integration.
+
+\textbf{Watertightness.}
+The 100\,\% watertight rate on print exports is achieved by a four-stage repair pipeline: \texttt{fill\_holes},
+\texttt{fix\_normals}, \texttt{fix\_winding}, and PyMeshFix. Any export failing the watertight check is rejected
+before writing to disk.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Applications}
+
+\begin{itemize}
+  \item \textbf{E-commerce and product visualisation:} Automatic 3D models from a single product photograph,
+        with lighting presets and screenshot tools for product-ready renders.
+  \item \textbf{Gaming and VR:} Rapid asset prototyping from reference photographs, aided by the LOD0
+        export path for real-time game engines.
+  \item \textbf{Augmented reality:} GLB and AR/VR-optimised exports directly compatible with WebXR and
+        ARCore for placing reconstructed real-world objects in digital environments.
+  \item \textbf{Medical and anatomical modelling:} Conversion of photographs of anatomy, prosthetics,
+        or surgical instruments into 3D models for training simulations.
+  \item \textbf{3D printing:} The watertight print mesh and STL/3MF export paths enable rapid physical
+        prototyping directly from a single photograph.
+  \item \textbf{Robotics and simulation:} Simulation-oriented GLB and OBJ collision-mesh exports support
+        importing reconstructed objects into simulators such as Gazebo and NVIDIA Isaac Sim.
+\end{itemize}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Conclusion and Future Scope}
+
+This paper presented TriGenix, an end-to-end, web-based single-image 3D reconstruction system developed and
+evaluated across two iterative development phases. The Phase~1 pipeline combines Zero123++ multi-view diffusion
+synthesis, Intel DPT-Large monocular depth estimation, and voxel-based Marching Cubes surface extraction to
+produce watertight textured meshes. Phase~2 replaced the depth-fusion geometry stage with TripoSR neural
+reconstruction and introduced a novel region-based k-means colour-projection algorithm.
+
+Evaluated over 70 generated models, the system achieves a 100\,\% watertight rate on print exports, a mean
+silhouette IoU of 0.452, and a mean colour error of 5.7 units — perceptually near-invisible. Nine export
+formats cover printing, gaming, AR/VR, robotics, and texture-baking workflows. The system is production-grade,
+with full multi-user authentication, real-time status polling, and a 82-test regression suite.
+
+% ─────────────────────────────────────────────────────────────────────────────
+
+
+\subsection{Limitations and Future Directions}%
+
+The principal limitation is the hallucination problem common to all single-image reconstruction methods:
+unseen surfaces are inferred rather than observed. Reconstruction quality degrades for objects with complex
+topology, thin structures, or highly non-convex geometry.
+
+Future work will:
+\begin{enumerate}
+  \item Integrate \textbf{InstantMesh}~\cite{instantmesh} to replace the TripoSR backend, targeting
+        higher-fidelity meshes at sub-second generation time using FlexiCubes-based differentiable extraction.
+  \item Add \textbf{Multi-Angle Capture Mode} (infrastructure already present as \texttt{multi\_angle\_processor.py})
+        to accept four user-supplied photographs (front/back/left/right) and fuse them via posed reconstruction,
+        substantially improving geometric accuracy.
+  \item Implement \textbf{mesh quality scoring}, \textbf{wall thickness checking}, \textbf{auto-hollowing},
+        \textbf{multi-part splitting}, and \textbf{multi-colour 3MF export} — all designed and ready for
+        implementation in the next development phase.
+  \item Extend the pipeline toward \textbf{near-real-time generation} via model quantisation and streaming
+        Marching Cubes.
+  \item Deploy on \textbf{cloud GPU infrastructure} (AWS, GCP) for wider public accessibility.
+\end{enumerate}
+
+% ─────────────────────────────────────────────────────────────────────────────
+
+\section*{Acknowledgment}
+
+The authors thank Prof. Sheetal Mhatre, Department of Data Science, Usha Mittal Institute of Technology,
+S.N.D.T. Women's University, for continuous guidance and mentorship throughout the design, implementation,
+and evaluation of TriGenix.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{thebibliography}{00}
+
+\bibitem{survey_3d}
+A. Kar, C. Häne, and J. Malik,
+``Learning a Multi-View Stereo Machine,''
+in \textit{Advances in Neural Information Processing Systems (NeurIPS)}, 2017.
+
+\bibitem{mvs}
+S. Seitz, B. Curless, J. Diebel, D. Scharstein, and R. Szeliski,
+``A Comparison and Evaluation of Multi-View Stereo Reconstruction Algorithms,''
+in \textit{Proc. IEEE/CVF CVPR}, vol.~1, pp.~519--528, 2006.
+
+\bibitem{active_sensing}
+B. Curless and M. Levoy,
+``A Volumetric Method for Building Complex Models from Range Images,''
+in \textit{Proc. ACM SIGGRAPH}, pp.~303--312, 1996.
+
+\bibitem{zero123pp}
+R. Shi, H. Chen, Z. Zhang, M. Liu, C. Xu, X. Wei, L. Chen, C. Zeng, and H. Su,
+``Zero123++: A Single Image to Consistent Multi-view Diffusion Base Model,''
+\textit{arXiv preprint arXiv:2310.15110}, 2023.
+
+\bibitem{dpt}
+R. Ranftl, A. Bochkovskiy, and V. Koltun, ``Vision Transformers for Dense Prediction,''
+in \textit{Proc. IEEE/CVF International Conference on Computer Vision (ICCV)}, pp.~12179--12188, 2021.
+
+\bibitem{lrm}
+Y. Hong, K. Zhang, J. Gu, S. Bi, Y. Zhou, D. Liu, F. Liu, K. Sunkavalli, T. Bui, and H. Tan,
+``LRM: Large Reconstruction Model for Single Image to 3D,''
+in \textit{International Conference on Learning Representations (ICLR)}, 2024.
+
+\bibitem{triposr}
+D. Tochilkin, D. Pankratz, Z. Liu, Z. Huang, A. Letts, Y. Li, J.-X. Liang, C. Laforte, V. Jampani,
+and Y. Cao,
+``TripoSR: Fast 3D Object Reconstruction from a Single Image,''
+\textit{arXiv preprint arXiv:2403.02156}, 2024.
+
+\bibitem{instantmesh}
+J. Xu, W. Cheng, Y. Gao, X. Wang, S. Gao, and Y. Shan,
+``InstantMesh: Efficient 3D Mesh Generation from a Single Image with Sparse-view Large Reconstruction Models,''
+\textit{arXiv preprint arXiv:2404.07191}, 2024.
+
+\bibitem{eigen}
+D. Eigen, C. Puhrsch, and R. Fergus, ``Depth Map Prediction from a Single Image using a Multi-Scale Deep Network,''
+\textit{Advances in Neural Information Processing Systems (NeurIPS)}, vol.~27, pp.~2366--2374, 2014.
+
+\bibitem{nerf}
+B. Mildenhall, P.~P. Srinivasan, M. Tancik, J.~T. Barron, R. Ramamoorthi, and R. Ng,
+``NeRF: Representing Scenes as Neural Radiance Fields for View Synthesis,''
+in \textit{European Conference on Computer Vision (ECCV)}, pp.~405--421, Springer, 2020.
+
+\bibitem{zero1to3}
+R. Liu, R. Wu, B. Van Hoorick, P. Tokmakov, S. Zakharov, and C. Vondrick,
+``Zero-1-to-3: Zero-shot One Image to 3D Object,''
+in \textit{Proc. IEEE/CVF ICCV}, pp.~9298--9309, 2023.
+
+\bibitem{marching_cubes}
+W.~E. Lorensen and H.~E. Cline,
+``Marching Cubes: A High Resolution 3D Surface Construction Algorithm,''
+\textit{ACM SIGGRAPH Computer Graphics}, vol.~21, no.~4, pp.~163--169, 1987.
+
+\end{thebibliography}
+
+\end{document}

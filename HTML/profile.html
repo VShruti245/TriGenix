@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TriGenix — Profile</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../CSS/StyleDrop.css">
+  <style>
+    .profile-page {
+      padding-top: calc(var(--nav-h) + 48px);
+      padding-bottom: 80px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-left: 20px;
+      padding-right: 20px;
+      background: radial-gradient(ellipse 70% 40% at 50% 0%, rgba(139,127,248,.07) 0%, transparent 65%);
+    }
+
+    .profile-wrap { width: 100%; max-width: 700px; display: flex; flex-direction: column; gap: 20px; }
+
+    /* ── Profile header card ─────────────────────────────────── */
+    .profile-card {
+      background: var(--surface); border: 1px solid var(--border2);
+      border-radius: var(--r); padding: 28px 28px 24px;
+    }
+
+    .profile-top {
+      display: flex; align-items: flex-start; gap: 20px; margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+    .profile-avatar {
+      width: 64px; height: 64px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--acc2), var(--acc));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.6rem; font-weight: 700; color: #fff;
+      flex-shrink: 0; font-family: var(--mono);
+      border: 2px solid rgba(139,127,248,.3);
+    }
+    .profile-info { flex: 1; }
+    .profile-username {
+      font-size: 1.3rem; font-weight: 700; letter-spacing: -.02em;
+      color: var(--text); margin-bottom: 2px;
+    }
+    .profile-email {
+      font-family: var(--mono); font-size: .72rem; color: var(--muted); margin-bottom: 6px;
+    }
+    .profile-joined {
+      font-family: var(--mono); font-size: .66rem;
+      color: var(--muted); letter-spacing: .04em;
+    }
+    .profile-joined span { color: var(--acc); }
+
+    /* ── Stats grid ──────────────────────────────────────────── */
+    .stats-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 12px; margin-bottom: 24px;
+    }
+    .stat-box {
+      background: var(--bg); border: 1px solid var(--border2);
+      border-radius: 10px; padding: 14px 16px;
+      text-align: center;
+    }
+    .stat-box .sb-val {
+      font-family: var(--mono); font-size: 1.6rem; font-weight: 700;
+      color: var(--text); display: block; margin-bottom: 3px;
+    }
+    .stat-box .sb-lbl {
+      font-family: var(--mono); font-size: .58rem;
+      color: var(--muted); letter-spacing: .08em; text-transform: uppercase;
+    }
+    .stat-box.highlight { border-color: rgba(139,127,248,.3); background: rgba(139,127,248,.04); }
+    .stat-box.highlight .sb-val { color: var(--acc); }
+
+    /* ── Edit form ───────────────────────────────────────────── */
+    .edit-section { border-top: 1px solid var(--border2); padding-top: 20px; }
+    .edit-section h4 {
+      font-family: var(--mono); font-size: .72rem; color: var(--muted);
+      letter-spacing: .1em; text-transform: uppercase; margin-bottom: 14px;
+    }
+    .edit-fields { display: flex; flex-direction: column; gap: 12px; }
+    .field-group { display: flex; flex-direction: column; gap: 5px; }
+    .field-label { font-family: var(--mono); font-size: .64rem; color: var(--sub); letter-spacing: .06em; text-transform: uppercase; }
+    .field-input {
+      background: var(--bg); border: 1px solid var(--border2);
+      border-radius: 8px; padding: 11px 14px;
+      color: var(--text); font-family: var(--font); font-size: .88rem;
+      outline: none; transition: border-color .15s; width: 100%;
+    }
+    .field-input:focus { border-color: var(--acc); }
+    .field-input::placeholder { color: var(--muted); }
+    textarea.field-input { resize: vertical; min-height: 80px; }
+
+    .save-btn {
+      padding: 11px 24px; border-radius: 8px; border: none;
+      background: var(--text); color: var(--bg);
+      font-family: var(--mono); font-size: .78rem; font-weight: 700;
+      cursor: pointer; transition: opacity .15s, transform .12s;
+      align-self: flex-start;
+    }
+    .save-btn:hover { opacity: .88; transform: translateY(-1px); }
+    .save-btn:disabled { opacity: .3; cursor: not-allowed; }
+
+    .save-msg {
+      font-family: var(--mono); font-size: .72rem;
+      padding: 8px 12px; border-radius: 6px; display: none;
+    }
+    .save-msg.ok  { background: rgba(74,222,128,.07); border: 1px solid rgba(74,222,128,.2); color: var(--green); display: block; }
+    .save-msg.err { background: rgba(255,107,107,.07); border: 1px solid rgba(255,107,107,.2); color: var(--red); display: block; }
+
+    /* ── Recent activity card ────────────────────────────────── */
+    .activity-card {
+      background: var(--surface); border: 1px solid var(--border2);
+      border-radius: var(--r); padding: 22px 24px;
+    }
+    .activity-card h4 {
+      font-family: var(--mono); font-size: .72rem; color: var(--muted);
+      letter-spacing: .1em; text-transform: uppercase; margin-bottom: 16px;
+    }
+    .activity-list { display: flex; flex-direction: column; gap: 10px; }
+    .activity-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 12px; background: var(--bg);
+      border: 1px solid var(--border2); border-radius: 8px;
+      transition: border-color .15s; text-decoration: none;
+    }
+    .activity-item:hover { border-color: rgba(139,127,248,.3); }
+    .act-thumb {
+      width: 44px; height: 44px; border-radius: 6px;
+      object-fit: cover; background: var(--surface);
+      flex-shrink: 0; border: 1px solid var(--border2);
+    }
+    .act-info { flex: 1; }
+    .act-date { font-family: var(--mono); font-size: .6rem; color: var(--muted); margin-bottom: 2px; }
+    .act-badges { display: flex; gap: 5px; flex-wrap: wrap; }
+    .act-badge {
+      font-family: var(--mono); font-size: .58rem; padding: 2px 7px;
+      border-radius: 4px; border: 1px solid var(--border2);
+      background: transparent; color: var(--sub);
+    }
+    .act-badge.glb { border-color: rgba(74,222,128,.2); color: var(--green); }
+    .act-btn {
+      font-family: var(--mono); font-size: .62rem; padding: 5px 10px;
+      border: 1px solid var(--border2); border-radius: 5px;
+      color: var(--sub); text-decoration: none; white-space: nowrap;
+      transition: all .15s; background: transparent;
+    }
+    .act-btn:hover { color: var(--text); border-color: var(--acc); }
+
+    /* ── Skel ────────────────────────────────────────────────── */
+    .skel { background: linear-gradient(90deg, var(--surface) 25%, rgba(255,255,255,.04) 50%, var(--surface) 75%); background-size: 200% 100%; animation: skel 1.4s ease infinite; border-radius: 6px; }
+    @keyframes skel { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+  </style>
+</head>
+<body>
+
+<!-- ── Navigation ──────────────────────────────────────────────── -->
+<nav class="tg-nav">
+  <div class="tg-nav-left">
+    <a href="../HTML/trigenix.html" class="tg-logo">
+      <div class="tg-logo-mark">
+        <svg viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle class="tg-r1" cx="15" cy="15" r="4" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.5"/>
+          <circle class="tg-r2" cx="15" cy="15" r="4" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>
+          <circle class="tg-r3" cx="15" cy="15" r="4" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
+          <circle cx="15" cy="15" r="4" fill="white"/>
+        </svg>
+      </div>
+      TriGenix
+    </a>
+    <div class="tg-nav-links">
+      <a href="../HTML/trigenix.html">Home</a>
+      <a href="DropImage.html">Generate</a>
+      <a href="History.html">History</a>
+      <a href="Profile.html" class="active">Profile</a>
+      <a href="Print3D.html">Print</a>
+    </div>
+  </div>
+  <div class="tg-nav-right">
+    <span id="nav-user" style="font-size:.78rem;color:var(--sub);font-family:var(--mono);"></span>
+    <div class="tg-nav-sep"></div>
+    <a href="DropImage.html" class="tg-btn-ghost">+ New</a>
+    <button class="tg-btn-fill" onclick="doLogout()" style="cursor:pointer;border:none;">Sign Out</button>
+  </div>
+</nav>
+
+<!-- ── Page ─────────────────────────────────────────────────────── -->
+<div class="profile-page">
+  <div class="profile-wrap">
+
+    <!-- Profile card -->
+    <div class="profile-card">
+      <div class="profile-top">
+        <div class="profile-avatar" id="p-avatar">?</div>
+        <div class="profile-info">
+          <div class="profile-username" id="p-username">
+            <div class="skel" style="width:140px;height:20px;"></div>
+          </div>
+          <div class="profile-email" id="p-email">—</div>
+          <div class="profile-joined">Member since <span id="p-joined">—</span></div>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-grid">
+        <div class="stat-box highlight">
+          <span class="sb-val" id="p-total">—</span>
+          <span class="sb-lbl">Generations</span>
+        </div>
+        <div class="stat-box">
+          <span class="sb-val" id="p-glb">—</span>
+          <span class="sb-lbl">3D models</span>
+        </div>
+        <div class="stat-box">
+          <span class="sb-val" id="p-avg">—</span>
+          <span class="sb-lbl">Avg time</span>
+        </div>
+      </div>
+
+      <!-- Edit form -->
+      <div class="edit-section">
+        <h4>Edit Profile</h4>
+        <div class="edit-fields">
+          <div class="field-group">
+            <label class="field-label">Display Name</label>
+            <input class="field-input" id="f-displayname" type="text" placeholder="Your display name (optional)">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Bio</label>
+            <textarea class="field-input" id="f-bio" placeholder="A short bio (optional)"></textarea>
+          </div>
+          <div id="save-msg" class="save-msg"></div>
+          <button class="save-btn" id="save-btn" onclick="saveProfile()">Save Changes</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent activity -->
+    <div class="activity-card">
+      <h4>Recent Generations</h4>
+      <div class="activity-list" id="activity-list">
+        <div class="skel" style="height:64px;border-radius:8px;"></div>
+        <div class="skel" style="height:64px;border-radius:8px;"></div>
+        <div class="skel" style="height:64px;border-radius:8px;"></div>
+      </div>
+      <div style="margin-top:14px;text-align:right;">
+        <a href="History.html" style="font-family:var(--mono);font-size:.72rem;color:var(--acc2);">View all generations →</a>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* XSS-safe HTML escape helper */
+function esc(v) {
+  if (v == null) return '';
+  return String(v)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+
+var _token    = localStorage.getItem('tg_token')    || '';
+var _username = localStorage.getItem('tg_username') || '';
+
+if (!_token) { window.location.href = '/HTML/Login.html'; }
+
+document.getElementById('nav-user').textContent = _username;
+
+function authUrl(url) {
+  if (!url) return url;
+  var isGenerated = url.indexOf('/generated/') === 0 ||
+    url.indexOf(window.location.origin + '/generated/') === 0;
+  if (!isGenerated || url.indexOf('token=') >= 0) return url;
+  return url + (url.indexOf('?') >= 0 ? '&' : '?') + 'token=' + encodeURIComponent(_token);
+}
+
+function absoluteAuthUrl(url) {
+  if (!url) return url;
+  return authUrl(url.indexOf('http') === 0 ? url : window.location.origin + url);
+}
+
+function doLogout() {
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', '/auth/logout', true);
+  xhr.setRequestHeader('Authorization', 'Bearer ' + _token);
+  xhr.onload = xhr.onerror = function() {
+    localStorage.removeItem('tg_token');
+    localStorage.removeItem('tg_username');
+    window.location.href = '/HTML/Login.html';
+  };
+  xhr.send();
+}
+
+/* ── Load profile ────────────────────────────────────────────── */
+function loadProfile() {
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', '/auth/profile', true);
+  xhr.setRequestHeader('Authorization', 'Bearer ' + _token);
+  xhr.onload = function() {
+    try {
+      var d = JSON.parse(xhr.responseText);
+      if (!d.ok) { window.location.href = '/HTML/Login.html'; return; }
+      var p = d.profile || {};
+      var s = d.stats   || {};
+
+      // Avatar initial
+      var initials = (p.username || '?').charAt(0).toUpperCase();
+      document.getElementById('p-avatar').textContent   = initials;
+      document.getElementById('p-username').textContent = p.display_name || p.username || '—';
+      document.getElementById('p-email').textContent    = p.email || '—';
+      document.getElementById('p-joined').textContent   = p.created_fmt || '—';
+
+      // Stats
+      document.getElementById('p-total').textContent = s.total_generations || 0;
+      document.getElementById('p-glb').textContent   = s.with_glb || 0;
+      document.getElementById('p-avg').textContent   = s.avg_time ? s.avg_time + 's' : '—';
+
+      // Pre-fill edit form
+      document.getElementById('f-displayname').value = p.display_name || '';
+      document.getElementById('f-bio').value         = p.bio || '';
+    } catch(e) {}
+  };
+  xhr.send();
+}
+
+/* ── Load recent activity ────────────────────────────────────── */
+function loadActivity() {
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', '/auth/history', true);
+  xhr.setRequestHeader('Authorization', 'Bearer ' + _token);
+  xhr.onload = function() {
+    try {
+      var d = JSON.parse(xhr.responseText);
+      if (!d.ok) return;
+      _renderActivity((d.history || []).slice(0, 5));
+    } catch(e) {}
+  };
+  xhr.send();
+}
+
+function _renderActivity(items) {
+  var list = document.getElementById('activity-list');
+  if (!items || items.length === 0) {
+    list.innerHTML = '<p style="font-size:.84rem;color:var(--muted);text-align:center;padding:20px 0;">No generations yet.</p>';
+    return;
+  }
+  list.innerHTML = items.map(function(item) {
+    var thumb = authUrl(item.masked_image || item.input_image || '');
+    var glbBadge = item.final_glb ? '<span class="act-badge glb">3D ready</span>' : '<span class="act-badge">views only</span>';
+    var timeBadge = item.proc_time ? '<span class="act-badge">' + esc(item.proc_time) + 's</span>' : '';
+    var vertsBadge = item.vertices ? '<span class="act-badge">' + esc(Number(item.vertices).toLocaleString()) + 'v</span>' : '';
+
+    var actionBtn = '';
+    if (item.final_glb) {
+      var vUrl = '/HTML/Viewer3d.html?model=' + encodeURIComponent(absoluteAuthUrl(item.final_glb)) + '&name=model.glb';
+      actionBtn = '<a class="act-btn" href="' + vUrl + '" target="_blank">Open 3D →</a>';
+    }
+
+    return (
+      '<div class="activity-item">' +
+        (thumb ? '<img class="act-thumb" src="' + thumb + '" alt="thumb">' : '<div class="act-thumb" style="background:var(--surface);"></div>') +
+        '<div class="act-info">' +
+          '<div class="act-date">🕐 ' + esc(item.created_fmt || '') + '</div>' +
+          '<div class="act-badges">' + glbBadge + timeBadge + vertsBadge + '</div>' +
+        '</div>' +
+        actionBtn +
+      '</div>'
+    );
+  }).join('');
+}
+
+/* ── Save profile ────────────────────────────────────────────── */
+window.saveProfile = function() {
+  var btn = document.getElementById('save-btn');
+  var msg = document.getElementById('save-msg');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  msg.className = 'save-msg';
+
+  var payload = {
+    display_name: document.getElementById('f-displayname').value.trim(),
+    bio:          document.getElementById('f-bio').value.trim(),
+  };
+
+  var xhr = new XMLHttpRequest();
+  xhr.open('POST', '/auth/profile', true);
+  xhr.setRequestHeader('Authorization', 'Bearer ' + _token);
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  xhr.onload = function() {
+    btn.disabled = false; btn.textContent = 'Save Changes';
+    try {
+      var d = JSON.parse(xhr.responseText);
+      if (d.ok) {
+        msg.textContent = '✓ Profile updated successfully';
+        msg.className   = 'save-msg ok';
+        // Update displayed name
+        if (payload.display_name)
+          document.getElementById('p-username').textContent = payload.display_name;
+        setTimeout(function() { msg.className = 'save-msg'; }, 3000);
+      } else {
+        msg.textContent = d.error || 'Update failed';
+        msg.className   = 'save-msg err';
+      }
+    } catch(e) {
+      msg.textContent = 'Server error'; msg.className = 'save-msg err';
+    }
+  };
+  xhr.onerror = function() {
+    btn.disabled = false; btn.textContent = 'Save Changes';
+    msg.textContent = 'Cannot reach server'; msg.className = 'save-msg err';
+  };
+  xhr.send(JSON.stringify(payload));
+};
+
+/* ── Init ───────────────────────────────────────────────────── */
+loadProfile();
+loadActivity();
+</script>
+</body>
+</html>

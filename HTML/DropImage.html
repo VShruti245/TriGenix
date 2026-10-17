@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TriGenix — Generate</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../CSS/StyleDrop.css">
+  <style>
+    /* ── ETA display ──────────────────────────────── */
+    .eta-display {
+      font-family: var(--mono); font-size: .66rem;
+      color: var(--acc); margin-top: 4px; text-align: right;
+      min-height: 16px;
+    }
+
+    /* ── Generation log ───────────────────────────── */
+    .gen-log {
+      margin-top: 12px;
+      background: var(--bg); border: 1px solid var(--border2);
+      border-radius: 8px; overflow: hidden;
+    }
+    .gen-log-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 9px 14px; cursor: pointer;
+      font-family: var(--mono); font-size: .7rem; color: var(--sub);
+      transition: background .15s;
+    }
+    .gen-log-header:hover { background: rgba(255,255,255,.03); }
+    .gen-log-body {
+      max-height: 160px; overflow-y: auto;
+      padding: 8px 14px 10px; border-top: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 3px;
+    }
+    .gen-log-body::-webkit-scrollbar { width: 3px; }
+    .gen-log-body::-webkit-scrollbar-thumb { background: #252525; border-radius: 2px; }
+    .log-line { display: flex; gap: 10px; font-size: .68rem; }
+    .log-t    { font-family: var(--mono); color: var(--acc2); flex-shrink: 0; }
+    .log-msg  { color: var(--sub); }
+
+    /* ── Re-generate button ───────────────────────── */
+    #regenBtn {
+      width: 100%; margin-top: 8px; padding: 11px;
+      border: 1px solid var(--border2); border-radius: 9px;
+      background: transparent; color: var(--sub);
+      font-family: var(--mono); font-size: .78rem; font-weight: 600;
+      cursor: pointer; transition: all .15s;
+    }
+    #regenBtn:hover { color: var(--text); background: rgba(255,255,255,.04); border-color: var(--border2); }
+    .webcam-modal {
+      position: fixed; inset: 0; z-index: 800;
+      background: rgba(0,0,0,.92);
+      display: none; align-items: center; justify-content: center;
+    }
+    .webcam-modal.open { display: flex; }
+    .webcam-box {
+      background: var(--surface); border: 1px solid var(--border2);
+      border-radius: var(--r); padding: 24px; width: 100%; max-width: 540px;
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    .webcam-box h3 {
+      font-family: var(--mono); font-size: .82rem; color: var(--acc);
+    }
+    #webcamVideo {
+      width: 100%; border-radius: 8px;
+      background: #000; aspect-ratio: 4/3; object-fit: cover;
+      border: 1px solid var(--border2);
+    }
+    .webcam-btns { display: flex; gap: 10px; }
+    .wc-btn {
+      flex: 1; padding: 11px; border-radius: 8px; border: none;
+      font-family: var(--mono); font-size: .78rem; font-weight: 700;
+      cursor: pointer; transition: opacity .15s;
+    }
+    .wc-btn.capture { background: var(--text); color: var(--bg); }
+    .wc-btn.cancel  { background: transparent; color: var(--sub);
+                       border: 1px solid var(--border2); }
+    .wc-btn:hover   { opacity: .85; }
+
+    /* ── Quality warning ──────────────────────────── */
+    .quality-warn {
+      margin-top: 10px; padding: 11px 14px;
+      background: rgba(255,107,107,.06);
+      border: 1px solid rgba(255,107,107,.25);
+      border-radius: 8px;
+      font-size: .78rem; color: #ffaaaa;
+      display: none; gap: 8px; align-items: flex-start;
+    }
+    .quality-warn.show  { display: flex; }
+    .quality-warn.ok    { background: rgba(74,222,128,.05); border-color: rgba(74,222,128,.2); color: #9af0b8; }
+    .quality-warn ul    { margin: 4px 0 0 14px; padding: 0; }
+    .quality-warn li    { margin-bottom: 2px; }
+    .quality-icon       { font-size: 1.1rem; flex-shrink: 0; }
+
+    /* ── Email notification field ─────────────────── */
+    .notify-row {
+      margin-top: 12px;
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 14px;
+      background: var(--bg); border: 1px solid var(--border2);
+      border-radius: 8px;
+    }
+    .notify-row label {
+      font-family: var(--mono); font-size: .66rem;
+      color: var(--muted); letter-spacing: .05em;
+      white-space: nowrap;
+    }
+    .notify-row input {
+      flex: 1; background: transparent; border: none;
+      color: var(--text); font-family: var(--font); font-size: .84rem;
+      outline: none;
+    }
+    .notify-row input::placeholder { color: var(--muted); }
+
+    .dimension-row {
+      margin-top: 10px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .dimension-field {
+      background: var(--bg);
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+    .dimension-field label {
+      display: block;
+      font-family: var(--mono);
+      font-size: .58rem;
+      color: var(--muted);
+      letter-spacing: .08em;
+      margin-bottom: 6px;
+    }
+    .dimension-field input {
+      width: 100%;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: .82rem;
+    }
+    .dimension-field input::placeholder { color: var(--muted); }
+
+    .multiview-panel {
+      margin-top: 12px;
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      background: rgba(255,255,255,.02);
+      padding: 10px 12px;
+    }
+    .multiview-panel summary {
+      cursor: pointer;
+      font-family: var(--mono);
+      font-size: .68rem;
+      letter-spacing: .06em;
+      color: var(--acc2);
+    }
+    .mv-hint {
+      margin: 8px 0 10px;
+      font-size: .76rem;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .mv-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+    .mv-slot {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-family: var(--mono);
+      font-size: .58rem;
+      color: var(--sub);
+    }
+    .mv-slot input[type="file"] { font-size: .62rem; color: var(--muted); }
+    .mv-status { margin-top: 8px; font-family: var(--mono); font-size: .62rem; color: var(--muted); }
+    .mv-status.ready { color: #9af0b8; }
+    .mv-status.partial { color: #ffd166; }
+    .geometry-note {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,209,102,.25);
+      background: rgba(255,209,102,.06);
+      font-size: .76rem;
+      line-height: 1.5;
+      color: #ffe08a;
+    }
+    .geometry-note.ok {
+      border-color: rgba(74,222,128,.22);
+      background: rgba(74,222,128,.05);
+      color: #9af0b8;
+    }
+
+    /* ── Cancel button ────────────────────────────── */
+    #cancelBtn {
+      display: none;
+      width: 100%; margin-top: 10px; padding: 11px;
+      border: 1px solid rgba(255,107,107,.4); border-radius: 9px;
+      background: rgba(255,107,107,.06); color: var(--red);
+      font-family: var(--mono); font-size: .8rem; font-weight: 700;
+      cursor: pointer; transition: background .15s;
+    }
+    #cancelBtn:hover { background: rgba(255,107,107,.12); }
+
+    /* ── Webcam capture button in drop zone ───────── */
+    .webcam-trigger {
+      margin-top: 10px;
+      display: inline-flex; align-items: center; gap: 6px;
+      font-family: var(--mono); font-size: .68rem;
+      color: var(--acc); padding: 5px 13px;
+      border: 1px solid rgba(139,127,248,.3); border-radius: 99px;
+      cursor: pointer; background: rgba(139,127,248,.06);
+      transition: background .15s;
+    }
+    .webcam-trigger:hover { background: rgba(139,127,248,.12); }
+
+    /* ── Side-by-side comparison ──────────────────── */
+    .compare-wrap {
+      margin-top: 20px;
+      background: var(--bg); border: 1px solid var(--border2);
+      border-radius: 10px; overflow: hidden;
+    }
+    .compare-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border2);
+    }
+    .compare-header span {
+      font-family: var(--mono); font-size: .66rem;
+      color: var(--muted); letter-spacing: .1em; text-transform: uppercase;
+    }
+    .compare-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+    }
+    .compare-side {
+      padding: 16px; display: flex; flex-direction: column;
+      align-items: center; gap: 8px;
+    }
+    .compare-side:first-child { border-right: 1px solid var(--border2); }
+    .compare-side img {
+      width: 100%; border-radius: 7px;
+      border: 1px solid var(--border2); object-fit: contain;
+      max-height: 200px;
+    }
+    .compare-label {
+      font-family: var(--mono); font-size: .62rem;
+      color: var(--muted); text-transform: uppercase; letter-spacing: .08em;
+    }
+    .compare-3d-placeholder {
+      width: 100%; aspect-ratio: 1;
+      max-height: 200px;
+      border-radius: 7px; border: 1px solid var(--border2);
+      background: var(--surface);
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 6px;
+    }
+    .compare-3d-placeholder span {
+      font-family: var(--mono); font-size: .62rem; color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Webcam Modal ─────────────────────────────────────────── -->
+<div class="webcam-modal" id="webcamModal">
+  <div class="webcam-box">
+    <h3>📷 Webcam Capture</h3>
+    <video id="webcamVideo" autoplay playsinline muted></video>
+    <canvas id="webcamCanvas" style="display:none;"></canvas>
+    <div class="webcam-btns">
+      <button class="wc-btn capture" onclick="captureWebcam()">📸 Capture Photo</button>
+      <button class="wc-btn cancel"  onclick="closeWebcam()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Navigation ─────────────────────────────────────────── -->
+<nav class="tg-nav">
+  <div class="tg-nav-left">
+    <a href="../HTML/trigenix.html" class="tg-logo">
+      <div class="tg-logo-mark">
+        <svg viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle class="tg-r1" cx="15" cy="15" r="4" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.5"/>
+          <circle class="tg-r2" cx="15" cy="15" r="4" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>
+          <circle class="tg-r3" cx="15" cy="15" r="4" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
+          <circle cx="15" cy="15" r="4" fill="white"/>
+        </svg>
+      </div>
+      TriGenix
+    </a>
+    <div class="tg-nav-links">
+      <a href="../HTML/trigenix.html">Home</a>
+      <a href="../HTML/trigenix.html#features">Features</a>
+      <a href="../HTML/trigenix.html#how">How it works</a>
+      <a href="DropImage.html" class="active">Generate</a>
+    </div>
+  </div>
+  <div class="tg-nav-right">
+    <span id="nav-username" style="font-size:.78rem;color:var(--sub);font-family:var(--mono);"></span>
+    <div class="tg-nav-sep"></div>
+    <a href="History.html" class="tg-btn-ghost">History</a>
+    <a href="Profile.html" class="tg-btn-ghost">Profile</a>
+    <a href="Viewer3d.html" class="tg-btn-ghost">3D Viewer</a>
+    <a href="Print3D.html" class="tg-btn-ghost">Print</a>
+    <div class="tg-nav-sep"></div>
+    <button class="tg-btn-fill" onclick="doLogout()" style="cursor:pointer;border:none;">Sign Out</button>
+  </div>
+</nav>
+
+<!-- ── Page ────────────────────────────────────────────────── -->
+<div class="drop-page">
+
+  <div class="drop-header">
+    <div class="drop-badge">
+      <span class="drop-badge-dot"></span>
+      One photo | whole dimension
+    </div>
+    <h1><span class="grad">Photo to 3D Mesh</span><br></h1>
+    <p>Something goes in. Something entirely different comes out. <br> Drop an image — the rest happens in the dark.</p>
+  </div>
+
+  <div class="upload-card">
+    <input type="file" id="fileInput" accept="image/*">
+    <div id="dropZone">
+      <span class="dz-icon">🖼️</span>
+      <p class="dz-title">Drop an image here or click to browse</p>
+      <p class="dz-hint">PNG · JPG · WEBP &nbsp;·&nbsp; <kbd>Ctrl+V</kbd> to paste</p>
+      <div class="preview-wrap" id="previewWrap">
+        <img id="preview" src="#" alt="">
+        <button class="remove-btn" id="removeBtn">✕</button>
+      </div>
+    </div>
+
+    <!-- Webcam trigger -->
+    <div style="text-align:center;margin-top:10px;">
+      <span class="webcam-trigger" onclick="openWebcam()">📷 Use Webcam</span>
+    </div>
+
+    <!-- Image quality warning -->
+    <div class="quality-warn" id="qualityWarn">
+      <span class="quality-icon">⚠️</span>
+      <div>
+        <strong>Image quality warnings:</strong>
+        <ul id="qualityList"></ul>
+      </div>
+    </div>
+
+    <!-- Email notification -->
+    <div class="notify-row">
+      <label>NOTIFY EMAIL</label>
+      <input type="email" id="notifyEmail" placeholder="you@example.com (optional — get emailed when done)">
+    </div>
+
+    <details class="multiview-panel" id="multiviewPanel">
+      <summary>Optional: upload your own 6 views (better back/side accuracy)</summary>
+      <p class="mv-hint">Provide real photos at the same angles Zero123++ would synthesize. All six are required if you use this mode.</p>
+      <div class="mv-grid">
+        <label class="mv-slot">View 0 · Az 30° El +20°<input type="file" id="mv0" accept="image/*" data-view="view_0"></label>
+        <label class="mv-slot">View 1 · Az 90° El -10°<input type="file" id="mv1" accept="image/*" data-view="view_1"></label>
+        <label class="mv-slot">View 2 · Az 150° El +20°<input type="file" id="mv2" accept="image/*" data-view="view_2"></label>
+        <label class="mv-slot">View 3 · Az 210° El -10°<input type="file" id="mv3" accept="image/*" data-view="view_3"></label>
+        <label class="mv-slot">View 4 · Az 270° El +20°<input type="file" id="mv4" accept="image/*" data-view="view_4"></label>
+        <label class="mv-slot">View 5 · Az 330° El -10°<input type="file" id="mv5" accept="image/*" data-view="view_5"></label>
+      </div>
+      <div class="mv-status" id="mvStatus">No extra views selected — Zero123++ will synthesize them.</div>
+    </details>
+
+    <div class="dimension-row">
+      <div class="dimension-field">
+        <label>WIDTH MM</label>
+        <input type="number" id="targetWidth" min="1" max="10000" step="0.1" placeholder="auto">
+      </div>
+      <div class="dimension-field">
+        <label>HEIGHT MM <span style="font-weight:400;opacity:.6;">(default 100mm)</span></label>
+        <input type="number" id="targetHeight" min="1" max="10000" step="0.1" placeholder="100" value="100">
+      </div>
+      <div class="dimension-field">
+        <label>DEPTH MM</label>
+        <input type="number" id="targetDepth" min="1" max="10000" step="0.1" placeholder="auto">
+      </div>
+    </div>
+
+    <!-- Real-time progress -->
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-stages" id="progressStages">
+        <div class="stage-item" id="stage-0">
+          <span class="stage-icon">✂️</span>
+          <span class="stage-label">Background<br>Removal</span>
+        </div>
+        <div class="stage-item" id="stage-1">
+          <span class="stage-icon">📐</span>
+          <span class="stage-label">View<br>Synthesis</span>
+        </div>
+        <div class="stage-item" id="stage-2">
+          <span class="stage-icon">🌊</span>
+          <span class="stage-label">Depth<br><span style="font-size:.8em;opacity:.7;">Estimation</span><br><span style="font-size:.65em;opacity:.5;">preview only</span></span>
+        </div>
+        <div class="stage-item" id="stage-3">
+          <span class="stage-icon">🧊</span>
+          <span class="stage-label">Mesh<br>Reconstruction</span>
+        </div>
+        <div class="stage-item" id="stage-4">
+          <span class="stage-icon">📦</span>
+          <span class="stage-label">Exporting<br>.glb</span>
+        </div>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <div class="progress-status">
+        <span class="tick">›</span>
+        <span id="progressLabel">Starting…</span>
+        <span class="pct" id="progressPct">0%</span>
+      </div>
+      <div class="eta-display" id="eta-display"></div>
+    </div>
+
+    <!-- Generation log (collapsible) -->
+    <div class="gen-log" id="gen-log" style="display:none;">
+      <div class="gen-log-header" onclick="toggleLog()">
+        <span>📋 Generation Log</span>
+        <span id="log-toggle-icon">▼</span>
+      </div>
+      <div class="gen-log-body" id="gen-log-body"></div>
+    </div>
+
+    <button id="submitBtn" disabled>GENERATE</button>
+    <button id="cancelBtn" onclick="cancelGeneration()">✕ Cancel Generation</button>
+    <button id="regenBtn" style="display:none;" onclick="reGenerate()">↺ Re-Generate Same Image</button>
+  </div>
+
+  <div id="resultArea"></div>
+  <div class="lb" id="lb"><img id="lbImg" src="" alt=""></div>
+
+</div>
+
+<script src="../JS/DropImage.js"></script>
+</body>
+</html>

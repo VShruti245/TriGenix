@@ -1,0 +1,1056 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>TriGenix — 2D to 3D in Seconds</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0a0a;--bg1:#0f0f0f;--bg2:#141414;--surface:#1a1a1a;
+  --border:rgba(255,255,255,.08);--border2:rgba(255,255,255,.14);
+  --text:#f0eff4;--sub:rgba(240,239,244,.45);--muted:rgba(240,239,244,.25);
+  --acc:#8b7ff8;--acc2:#6c5ff0;--acc-glow:rgba(139,127,248,.18);
+  --font:'Plus Jakarta Sans',system-ui,sans-serif;
+  --ease:cubic-bezier(.22,1,.36,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--font);overflow-x:hidden;-webkit-font-smoothing:antialiased;}
+a{color:inherit;text-decoration:none}img{display:block;max-width:100%}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:#333;border-radius:99px}
+
+.nav{position:fixed;top:0;left:0;right:0;z-index:800;display:flex;align-items:center;justify-content:space-between;padding:0 2rem;height:60px;border-bottom:1px solid transparent;transition:background .35s,border-color .35s;}
+.nav.scrolled{background:rgba(10,10,10,.85);backdrop-filter:blur(20px);border-color:var(--border);}
+.nav-left{display:flex;align-items:center;gap:2.5rem}
+.nav-logo{display:flex;align-items:center;gap:.55rem;font-size:.95rem;font-weight:700;letter-spacing:-.02em;}
+.logo-mark{width:30px;height:30px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.logo-mark svg{width:30px;height:30px;overflow:visible;}
+@keyframes tgRing{0%{r:6;opacity:.8}100%{r:18;opacity:0}}
+.tg-r1{animation:tgRing 2s ease-out infinite;}
+.tg-r2{animation:tgRing 2s ease-out infinite .65s;}
+.tg-r3{animation:tgRing 2s ease-out infinite 1.3s;}
+.nav-links{display:flex;gap:.25rem}
+.nav-links a{font-size:.82rem;color:var(--sub);padding:.4rem .85rem;border-radius:8px;transition:color .2s,background .2s;}
+.nav-links a:hover{color:var(--text);background:rgba(255,255,255,.06)}
+.nav-right{display:flex;align-items:center;gap:.75rem}
+.btn-nav-ghost{font-size:.82rem;font-weight:500;color:var(--sub);padding:.45rem 1rem;border-radius:8px;transition:color .2s,background .2s;}
+.btn-nav-ghost:hover{color:var(--text);background:rgba(255,255,255,.06)}
+.btn-nav-fill{font-size:.82rem;font-weight:600;background:var(--text);color:var(--bg);padding:.45rem 1.1rem;border-radius:8px;transition:opacity .2s,transform .2s;}
+.btn-nav-fill:hover{opacity:.88;transform:translateY(-1px)}
+
+.hero{position:relative;min-height:100vh;padding-top:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(139,127,248,.1) 0%,transparent 70%);}
+.hero::before{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px);background-size:48px 48px;mask-image:radial-gradient(ellipse 90% 70% at 50% 30%,black,transparent);pointer-events:none;}
+.hero-badge{display:inline-flex;align-items:center;gap:.5rem;font-size:.75rem;font-weight:500;background:rgba(139,127,248,.12);color:var(--acc);border:1px solid rgba(139,127,248,.25);border-radius:99px;padding:.35rem 1rem;margin-bottom:2rem;animation:fadeUp .7s var(--ease) .1s both;}
+.badge-dot{width:5px;height:5px;border-radius:50%;background:var(--acc);animation:ping 2s ease infinite;box-shadow:0 0 6px var(--acc);}
+@keyframes ping{0%,100%{opacity:1}50%{opacity:.3}}
+.hero-title{font-size:clamp(2.5rem,6vw,5.2rem);font-weight:700;letter-spacing:-.04em;line-height:1.05;text-align:center;max-width:14ch;margin-bottom:1.5rem;animation:fadeUp .8s var(--ease) .2s both;}
+.hero-title .grad{background:linear-gradient(135deg,#fff 30%,rgba(139,127,248,.8));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.hero-sub{font-size:1rem;line-height:1.75;color:var(--sub);text-align:center;max-width:480px;margin-bottom:2.5rem;animation:fadeUp .8s var(--ease) .3s both;}
+.hero-ctas{display:flex;gap:.75rem;flex-wrap:wrap;justify-content:center;margin-bottom:4.5rem;animation:fadeUp .8s var(--ease) .4s both;}
+.btn-primary{display:inline-flex;align-items:center;gap:.5rem;font-size:.9rem;font-weight:600;background:var(--text);color:var(--bg);padding:.75rem 1.75rem;border-radius:10px;transition:opacity .2s,transform .2s,box-shadow .2s;}
+.btn-primary:hover{opacity:.9;transform:translateY(-2px);box-shadow:0 8px 32px rgba(255,255,255,.1)}
+.btn-secondary{display:inline-flex;align-items:center;gap:.5rem;font-size:.9rem;font-weight:500;color:var(--sub);border:1px solid var(--border2);padding:.73rem 1.75rem;border-radius:10px;transition:color .2s,border-color .2s,background .2s;}
+.btn-secondary:hover{color:var(--text);border-color:rgba(255,255,255,.25);background:rgba(255,255,255,.04)}
+
+
+.marquee-section{padding:3rem 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);overflow:hidden;}
+.marquee-label{text-align:center;font-size:.72rem;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:2rem;}
+.marquee-track{overflow:hidden;width:100%}
+.marquee-inner{display:flex;gap:3rem;width:max-content;animation:marqueeRoll 30s linear infinite;}
+.m-item{display:flex;align-items:center;gap:.6rem;font-size:.82rem;font-weight:600;color:rgba(255,255,255,.18);white-space:nowrap;}
+.m-dot{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.1)}
+@keyframes marqueeRoll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
+.section{padding:7rem 2rem;max-width:1160px;margin:0 auto}
+.sec-tag{display:inline-flex;align-items:center;gap:.5rem;font-size:.72rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--acc);margin-bottom:1.25rem;}
+.sec-tag::before{content:'';display:inline-block;width:16px;height:1.5px;background:var(--acc)}
+.sec-h{font-size:clamp(2rem,4vw,3.2rem);font-weight:700;letter-spacing:-.04em;line-height:1.05;margin-bottom:1.25rem;}
+
+.bento{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5px;background:var(--border);border:1px solid var(--border);border-radius:20px;overflow:hidden;}
+.bento-cell{background:var(--bg1);padding:2.5rem;position:relative;overflow:hidden;transition:background .3s;}
+.bento-cell:hover{background:var(--bg2)}
+.bento-cell.span2{grid-column:span 2}
+.bento-cell::after{content:'';position:absolute;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,var(--acc-glow),transparent 70%);top:-60px;right:-60px;opacity:0;transition:opacity .4s;pointer-events:none;}
+.bento-cell:hover::after{opacity:1}
+.cell-icon{width:40px;height:40px;border-radius:10px;background:rgba(139,127,248,.12);border:1px solid rgba(139,127,248,.2);display:flex;align-items:center;justify-content:center;font-size:1.1rem;margin-bottom:1.5rem;}
+.cell-tag{font-size:.65rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--acc);margin-bottom:.75rem;display:block;}
+.bento-cell h3{font-size:1.1rem;font-weight:700;letter-spacing:-.02em;margin-bottom:.6rem;line-height:1.3;}
+.bento-cell p{font-size:.83rem;line-height:1.75;color:var(--sub)}
+.cell-canvas-wrap{margin-top:1.5rem;border-radius:12px;overflow:hidden;border:1px solid var(--border);aspect-ratio:16/7;background:var(--surface);}
+.cell-canvas-wrap canvas{width:100%;height:100%;display:block}
+
+#how{background:var(--bg1);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.how-inner{max-width:1160px;margin:0 auto;padding:7rem 2rem}
+.steps-grid{display:grid;grid-template-columns:repeat(4,1fr);margin-top:4rem;border:1px solid var(--border);border-radius:16px;overflow:hidden;background:var(--border);}
+.step-cell{background:var(--bg1);padding:2rem 1.75rem;border-right:1px solid var(--border);transition:background .3s;}
+.step-cell:last-child{border-right:none}.step-cell:hover{background:var(--bg2)}
+.step-num{font-size:.65rem;font-weight:700;letter-spacing:.12em;color:var(--acc);margin-bottom:1.25rem;display:flex;align-items:center;gap:.5rem;}
+.step-num::after{content:'';flex:1;height:1px;background:var(--border)}
+.step-cell h4{font-size:.95rem;font-weight:700;margin-bottom:.6rem;}
+.step-cell p{font-size:.78rem;line-height:1.75;color:var(--sub)}
+.step-icon{font-size:1.8rem;margin-bottom:1rem;display:block}
+
+
+.cta-band{background:linear-gradient(135deg,#1a1a2e,#16162a,#1a1a2e);border:1px solid rgba(139,127,248,.2);border-radius:24px;overflow:hidden;position:relative;padding:5rem 4rem;text-align:center;}
+.cta-band::before{content:'';position:absolute;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(139,127,248,.12),transparent 70%);top:-150px;left:50%;transform:translateX(-50%);pointer-events:none;}
+.cta-band h2{font-size:clamp(2rem,4vw,3.2rem);font-weight:700;letter-spacing:-.04em;line-height:1.1;margin-bottom:1rem;position:relative;}
+.cta-band p{font-size:.95rem;color:var(--sub);line-height:1.75;max-width:440px;margin:0 auto 2.5rem;position:relative;}
+
+footer{border-top:1px solid var(--border);padding:3rem 2rem;max-width:1160px;margin:0 auto;}
+.footer-top{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:3rem;padding-bottom:3rem;border-bottom:1px solid var(--border);margin-bottom:2rem;}
+.footer-brand{max-width:260px}.footer-brand p{font-size:.8rem;line-height:1.7;color:var(--sub);margin-top:.75rem;}
+.footer-cols{display:flex;gap:4rem;flex-wrap:wrap}
+.footer-col h5{font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:1.25rem;}
+.footer-col a{display:block;font-size:.82rem;color:var(--sub);margin-bottom:.65rem;transition:color .2s;}
+.footer-col a:hover{color:var(--text)}
+.footer-bottom{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;}
+.footer-bottom p{font-size:.75rem;color:var(--muted)}
+
+.sr{opacity:0;transform:translateY(22px);transition:opacity .9s var(--ease),transform .9s var(--ease);}
+.sr.vis{opacity:1;transform:none}
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+
+
+
+</style>
+</head>
+<body>
+
+<nav class="nav" id="nav">
+  <div class="nav-left">
+    <a href="#" class="nav-logo"><div class="logo-mark"><svg viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg"><circle class="tg-r1" cx="15" cy="15" r="6" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.5"/><circle class="tg-r2" cx="15" cy="15" r="6" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/><circle class="tg-r3" cx="15" cy="15" r="6" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/><circle cx="15" cy="15" r="5" fill="white"/></svg></div>TriGenix</a>
+    <div class="nav-links"><a href="#">Home</a><a href="#features">Features</a><a href="#how">How it works</a></div>
+  </div>
+  <div class="nav-right">
+    <a href="../HTML/Viewer3d.html" class="btn-nav-ghost">3D Viewer</a>
+    <a href="../HTML/DropImage.html" class="btn-nav-fill">Generate →</a>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="hero-badge"><span class="badge-dot"></span>PYTHON · ML  </div>
+  <h1 class="hero-title"><span class="grad">From Photo</span><br>to 3D Model</h1>
+  <p class="hero-sub">Upload a photo and TriGenix generates a production-ready 3D model. Export to OBJ or GLB —  <strong style="color:#fff"></strong> ready for printing, rendering, or deployment.</p>
+  <div class="hero-ctas">
+    <a href="../HTML/DropImage.html" class="btn-primary">Generate a 3D Model →</a>
+    <a href="#how" class="btn-secondary">See how it works</a>
+  </div>
+</section>
+
+
+
+<div class="section" id="features">
+  <div class="sr"><span class="sec-tag">Features</span><h2 class="sec-h">Built to make<br>3D creation easy</h2></div>
+  <div class="bento sr" style="margin-top:3rem">
+    <div class="bento-cell span2">
+      <div class="cell-icon">🖼️</div>
+      <span class="cell-tag">Simple Input</span>
+      <h3>Any photo, any object</h3>
+      <p>Upload a JPEG, PNG or WEBP of any object. No 3D software, no special camera setup — just drag and drop.</p>
+    </div>
+    <div class="bento-cell">
+      <div class="cell-icon">📦</div>
+      <span class="cell-tag">GLB Output</span>
+      <h3>Industry-standard .glb</h3>
+      <p>Every model is exported as a binary glTF (.glb) — load it in Blender, Unity, three.js, or view it directly in the browser.</p>
+    </div>
+    <div class="bento-cell">
+      <div class="cell-icon">🎨</div>
+      <span class="cell-tag">Vertex Colours</span>
+      <h3>Colours baked from your photo</h3>
+      <p>Pixel colours from your input image are projected onto every vertex of the mesh — no UV maps needed.</p>
+    </div>
+    <div class="bento-cell">
+      <div class="cell-icon">🔒</div>
+      <span class="cell-tag">Runs Locally</span>
+      <h3>Everything stays on your machine</h3>
+      <p>The entire pipeline runs on your own hardware via Python. No cloud, no data leaving your device.</p>
+    </div>
+    <div class="bento-cell">
+      <div class="cell-icon">🌐</div>
+      <span class="cell-tag">Use Anywhere</span>
+      <h3>Games, AR, web & more</h3>
+      <p>Drop the .glb into a game engine, embed it in three.js, open it in AR Quick Look, or inspect it in the built-in 3D viewer.</p>
+    </div>
+  </div>
+</div>
+
+<section id="how">
+  <div class="how-inner">
+    <div class="sr"><span class="sec-tag">Process</span><h2 class="sec-h">How it works</h2></div>
+    <div class="steps-grid sr">
+      <div class="step-cell"><div class="step-num">STEP 01</div><span class="step-icon">🖼️</span><h4>Upload a photo</h4><p>Drop any JPEG, PNG or WEBP. Works with product photos, scans, or casual snapshots.</p></div>
+      <div class="step-cell"><div class="step-num">STEP 02</div><span class="step-icon">✂️</span><h4>Background removal</h4><p>rembg isolates your subject with a clean alpha mask, removing the background automatically.</p></div>
+      <div class="step-cell"><div class="step-num">STEP 03</div><span class="step-icon">🌊</span><h4>Depth &amp; mesh</h4><p>DepthAnything estimates per-pixel depth. Zero123++ generates surrounding views. The mesh is carved from a visual hull or reconstructed with TripoSR.</p></div>
+      <div class="step-cell"><div class="step-num">STEP 04</div><span class="step-icon">📦</span><h4>Download your .glb</h4><p>Colours are baked onto the mesh vertices and the model is exported as a .glb — open it in the built-in viewer or take it anywhere.</p></div>
+    </div>
+  </div>
+</section>
+
+
+<div style="max-width:1160px;margin:0 auto;padding:0 2rem 7rem;margin-top: 40px">
+  <div class="cta-band sr">
+    <h2>Turn any photo into<br>a 3D model in minutes</h2>
+    <p>Run TriGenix locally, upload an image, and get a coloured .glb file — no cloud, no sign-up, no cost.</p>
+    <div style="display:flex;gap:.75rem;flex-wrap:wrap;justify-content:center">
+      <a href="../HTML/DropImage.html" class="btn-primary">Generate a 3D Model →</a>
+      <a href="../HTML/Viewer3d.html" class="btn-secondary">Open 3D Viewer</a>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="footer-top">
+    <div class="footer-brand">
+      <a href="#" class="nav-logo" style="display:inline-flex"><div class="logo-mark"><svg viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg"><circle class="tg-r1" cx="15" cy="15" r="6" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.5"/><circle class="tg-r2" cx="15" cy="15" r="6" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/><circle class="tg-r3" cx="15" cy="15" r="6" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/><circle cx="15" cy="15" r="5" fill="white"/></svg></div>TriGenix</a>
+      <p>ML-powered 3D reconstruction pipeline. From photo to coloured .glb — running entirely on your own hardware.</p>
+    </div>
+    <div class="footer-cols">
+      <div class="footer-col"><h5>Product</h5><a href="#">Features</a><a href="#">Pricing</a><a href="#">API</a><a href="#">Changelog</a></div>
+      <div class="footer-col"><h5>Use Cases</h5><a href="#">Gaming & VR</a><a href="#">Architecture</a><a href="#">Medical</a><a href="#">Fashion</a></div>
+      <div class="footer-col"><h5>Resources</h5><a href="#">Documentation</a><a href="#">GitHub</a><a href="#">Blog</a><a href="#">Community</a></div>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <p>© 2024 TriGenix. All rights reserved.</p>
+    <div style="display:flex;gap:2rem"><a href="#" style="font-size:.75rem;color:var(--muted)">Privacy</a><a href="#" style="font-size:.75rem;color:var(--muted)">Terms</a></div>
+  </div>
+</footer>
+
+<script src="../JS/vendor/three.min.js"></script>
+<script>
+'use strict';
+
+/* nav */
+const nav=document.getElementById('nav');
+window.addEventListener('scroll',()=>nav.classList.toggle('scrolled',scrollY>30),{passive:true});
+document.querySelectorAll('a[href^="#"]').forEach(a=>a.addEventListener('click',e=>{
+  const t=document.querySelector(a.getAttribute('href'));
+  if(t){e.preventDefault();t.scrollIntoView({behavior:'smooth'});}
+}));
+(()=>{
+  const io=new IntersectionObserver(en=>{en.forEach(e=>{if(e.isIntersecting){const kids=[...e.target.parentElement.querySelectorAll('.sr')];e.target.style.transitionDelay=(kids.indexOf(e.target)*80)+'ms';e.target.classList.add('vis');io.unobserve(e.target);}});},{threshold:.08});
+  document.querySelectorAll('.sr').forEach(el=>io.observe(el));
+})();
+
+/* input card removed */
+(()=>{
+  const c=document.getElementById('c-input');
+  if(!c)return; return;
+  const ctx=c.getContext('2d');
+  const W=600,H=600;
+
+  function rr(ctx,x,y,w,h,r){
+    ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);
+    ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);
+    ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);
+    ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);
+    ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();
+  }
+
+  let scanY=0,scanDir=1;
+  const featurePts=[
+    {x:148,y:218},{x:210,y:195},{x:300,y:190},{x:390,y:200},{x:452,y:215},
+    {x:158,y:290},{x:258,y:270},{x:345,y:260},{x:435,y:275},
+    {x:165,y:360},{x:270,y:345},{x:375,y:350},{x:455,y:345},
+    {x:200,y:415},{x:310,y:410},{x:410,y:420},
+  ];
+
+  function drawFrame(){
+    const pad=18,len=20,lw=2;
+    ctx.strokeStyle='rgba(139,127,248,.65)';ctx.lineWidth=lw;ctx.setLineDash([]);
+    [[pad,pad,1,1],[W-pad,pad,-1,1],[pad,H-pad,1,-1],[W-pad,H-pad,-1,-1]].forEach(([x,y,sx,sy])=>{
+      ctx.beginPath();ctx.moveTo(x,y+sy*len);ctx.lineTo(x,y);ctx.lineTo(x+sx*len,y);ctx.stroke();
+    });
+  }
+
+  function drawShoe(){
+    ctx.save();ctx.translate(300,330);
+
+    /* drop shadow */
+    const shg=ctx.createRadialGradient(0,105,10,0,110,145);
+    shg.addColorStop(0,'rgba(0,0,0,.5)');shg.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=shg;ctx.fillRect(-155,70,310,80);
+
+    /* sole */
+    ctx.beginPath();
+    ctx.moveTo(-145,102);ctx.lineTo(148,102);
+    ctx.quadraticCurveTo(168,102,163,122);
+    ctx.lineTo(-152,122);ctx.quadraticCurveTo(-168,122,-145,102);ctx.closePath();
+    ctx.fillStyle='#151528';ctx.fill();
+    ctx.strokeStyle='rgba(139,127,248,.35)';ctx.lineWidth=1.5;ctx.stroke();
+
+    /* midsole accent */
+    ctx.beginPath();ctx.moveTo(-143,102);ctx.lineTo(146,102);ctx.lineTo(160,112);ctx.lineTo(-151,112);ctx.closePath();
+    ctx.fillStyle='rgba(139,127,248,.28)';ctx.fill();
+
+    /* upper body gradient */
+    const ug=ctx.createLinearGradient(-145,-18,145,102);
+    ug.addColorStop(0,'#1c1c38');ug.addColorStop(0.5,'#22223e');ug.addColorStop(1,'#181830');
+    ctx.beginPath();
+    ctx.moveTo(-145,102);ctx.lineTo(-132,28);
+    ctx.quadraticCurveTo(-78,-12,0,-17);
+    ctx.quadraticCurveTo(78,-22,132,18);ctx.lineTo(148,102);ctx.closePath();
+    ctx.fillStyle=ug;ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,.1)';ctx.lineWidth=1;ctx.stroke();
+
+    /* specular highlight */
+    ctx.beginPath();
+    ctx.moveTo(-85,35);ctx.quadraticCurveTo(-22,8,62,28);
+    ctx.quadraticCurveTo(22,48,-65,58);ctx.closePath();
+    const hg=ctx.createLinearGradient(-85,28,62,48);
+    hg.addColorStop(0,'rgba(255,255,255,0)');hg.addColorStop(0.45,'rgba(255,255,255,.08)');hg.addColorStop(1,'rgba(255,255,255,0)');
+    ctx.fillStyle=hg;ctx.fill();
+
+    /* tongue */
+    ctx.beginPath();ctx.moveTo(-32,28);ctx.lineTo(-22,-12);
+    ctx.quadraticCurveTo(0,-22,22,-14);ctx.lineTo(28,28);ctx.closePath();
+    ctx.fillStyle='#26264c';ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,.07)';ctx.lineWidth=1;ctx.stroke();
+
+    /* lace rows */
+    ctx.strokeStyle='rgba(200,200,255,.48)';ctx.lineWidth=2;ctx.lineCap='round';
+    [[-20,-6,20,-6],[-24,5,24,5],[-26,16,26,16]].forEach(([x1,y1,x2,y2])=>{
+      ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+    });
+
+    /* swoosh */
+    ctx.beginPath();ctx.moveTo(-52,68);ctx.quadraticCurveTo(22,42,122,72);
+    ctx.strokeStyle='rgba(139,127,248,.65)';ctx.lineWidth=3;ctx.stroke();
+
+    /* toe cap */
+    ctx.beginPath();ctx.moveTo(100,20);ctx.quadraticCurveTo(135,38,148,102);
+    ctx.lineTo(118,102);ctx.quadraticCurveTo(108,55,95,25);ctx.closePath();
+    ctx.fillStyle='rgba(255,255,255,.03)';ctx.fill();
+
+    /* stitch dots */
+    ctx.fillStyle='rgba(255,255,255,.14)';
+    for(let i=-115;i<126;i+=13){ctx.beginPath();ctx.arc(i,98,1.5,0,Math.PI*2);ctx.fill();}
+
+    ctx.restore();
+  }
+
+  function drawDepthBands(t){
+    const bands=[
+      {y:435,h:40,c:'59,130,246',a:.22},
+      {y:395,h:44,c:'52,211,153',a:.18},
+      {y:352,h:46,c:'251,191,36',a:.14},
+      {y:308,h:46,c:'239,68,68',a:.11},
+    ];
+    bands.forEach((b,i)=>{
+      const pulse=0.85+0.15*Math.sin(t*0.8+i*0.9);
+      const g=ctx.createLinearGradient(0,b.y,0,b.y+b.h);
+      g.addColorStop(0,`rgba(${b.c},${b.a*pulse})`);
+      g.addColorStop(1,`rgba(${b.c},0)`);
+      ctx.fillStyle=g;ctx.fillRect(82,b.y,436,b.h);
+    });
+  }
+
+  function drawScanLine(){
+    const g=ctx.createLinearGradient(0,scanY-10,0,scanY+10);
+    g.addColorStop(0,'rgba(139,127,248,0)');
+    g.addColorStop(0.5,'rgba(139,127,248,.55)');
+    g.addColorStop(1,'rgba(139,127,248,0)');
+    ctx.fillStyle=g;ctx.fillRect(0,scanY-10,W,20);
+    ctx.fillStyle='rgba(139,127,248,.9)';ctx.fillRect(0,scanY-1,W,2);
+  }
+
+  function drawKeypoints(t){
+    featurePts.forEach((p,i)=>{
+      const pulse=0.5+0.5*Math.sin(t*2+i*0.7);
+      /* outer ring */
+      ctx.beginPath();ctx.arc(p.x,p.y,8+4*pulse,0,Math.PI*2);
+      ctx.strokeStyle=`rgba(139,127,248,${0.15*pulse})`;ctx.lineWidth=1.5;ctx.setLineDash([]);ctx.stroke();
+      /* core dot */
+      ctx.beginPath();ctx.arc(p.x,p.y,3,0,Math.PI*2);
+      ctx.fillStyle=`rgba(139,127,248,${0.75+0.25*pulse})`;ctx.fill();
+    });
+  }
+
+  function drawRulers(){
+    ctx.save();
+    ctx.strokeStyle='rgba(80,220,200,.55)';ctx.fillStyle='rgba(80,220,200,.85)';
+    ctx.font='bold 10px monospace';ctx.lineWidth=1;ctx.setLineDash([5,5]);
+
+    /* horizontal rule */
+    ctx.beginPath();ctx.moveTo(85,198);ctx.lineTo(510,198);ctx.stroke();
+    ctx.setLineDash([]);ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(85,193);ctx.lineTo(85,203);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(510,193);ctx.lineTo(510,203);ctx.stroke();
+    ctx.fillStyle='rgba(0,25,22,.7)';ctx.fillRect(272,186,62,14);
+    ctx.fillStyle='rgba(80,220,200,.9)';ctx.fillText('295 mm',275,198);
+
+    /* vertical rule */
+    ctx.setLineDash([5,5]);ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(76,200);ctx.lineTo(76,435);ctx.stroke();
+    ctx.setLineDash([]);ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(71,200);ctx.lineTo(81,200);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(71,435);ctx.lineTo(81,435);ctx.stroke();
+    ctx.fillStyle='rgba(0,25,22,.7)';ctx.fillRect(30,308,52,14);
+    ctx.fillStyle='rgba(80,220,200,.9)';ctx.fillText('105 mm',33,320);
+
+    ctx.restore();
+  }
+
+  function drawInfoChip(){
+    ctx.save();
+    ctx.fillStyle='rgba(139,127,248,.12)';
+    rr(ctx,W-165,18,148,46,7);ctx.fill();
+    ctx.strokeStyle='rgba(139,127,248,.35)';ctx.lineWidth=1;
+    rr(ctx,W-165,18,148,46,7);ctx.stroke();
+    ctx.fillStyle='rgba(139,127,248,.9)';ctx.font='600 10px monospace';
+    ctx.fillText('DEPTH MAP · LIVE',W-156,34);
+    ctx.fillStyle='rgba(80,220,200,.8)';ctx.font='10px monospace';
+    ctx.fillText(`${featurePts.length} keypoints · ACTIVE`,W-156,50);
+    ctx.restore();
+  }
+
+  function drawCRT(){
+    for(let y=0;y<H;y+=3){ctx.fillStyle='rgba(0,0,0,.04)';ctx.fillRect(0,y,W,1);}
+  }
+
+  let t=0;
+  function frame(){
+    requestAnimationFrame(frame);
+    t+=0.015;
+    ctx.clearRect(0,0,W,H);
+
+    /* bg */
+    ctx.fillStyle='#0d0d14';ctx.fillRect(0,0,W,H);
+
+    /* depth gradient overlay */
+    drawDepthBands(t);
+
+    /* photo vignette */
+    const vig=ctx.createRadialGradient(W/2,H/2,100,W/2,H/2,340);
+    vig.addColorStop(0,'rgba(0,0,0,0)');vig.addColorStop(1,'rgba(0,0,5,.72)');
+    ctx.fillStyle=vig;ctx.fillRect(0,0,W,H);
+
+    /* shoe */
+    drawShoe();
+
+    /* overlays */
+    drawRulers();
+    drawKeypoints(t);
+    drawFrame();
+    drawInfoChip();
+
+    /* scan */
+    scanY+=scanDir*1.4;
+    if(scanY>H-10||scanY<10)scanDir*=-1;
+    drawScanLine();
+
+    drawCRT();
+  }
+  frame();
+})();
+
+/* ═══════════════════════════════════════════════
+   THREE.JS SHARED SETUP
+═══════════════════════════════════════════════ */
+function mkR(id,alpha=true){
+  const canvas=document.getElementById(id);if(!canvas)return null;
+  const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.toneMapping=THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure=1.2;
+  renderer.setClearColor(0x0a0a0a,alpha?0:1);
+  const scene=new THREE.Scene();
+  const camera=new THREE.PerspectiveCamera(45,1,0.1,100);
+  camera.position.z=4;
+  function resize(){
+    const parent=canvas.parentElement;
+    const rw=parent?parent.clientWidth:300;
+    const rh=parent?parent.clientHeight:300;
+    if(!rw||!rh)return;
+    camera.aspect=rw/rh;camera.updateProjectionMatrix();
+    renderer.setSize(rw,rh,false);
+  }
+  setTimeout(resize,0);
+  if(window.ResizeObserver)new ResizeObserver(resize).observe(canvas.parentElement||canvas);
+  window.addEventListener('resize',resize,{passive:true});
+  return{renderer,scene,camera,canvas};
+}
+
+/* ═══════════════════════════════════════════════
+   OUTPUT CARD — Three.js sculptural shoe-last form
+   • distorted icosahedron body with metallic PBR
+   • animated orbiting coloured point lights
+   • wireframe seams + UV ring lines
+   • sweeping scan plane
+   • coloured particle cloud
+   • drag-to-rotate with inertia
+═══════════════════════════════════════════════ */
+(()=>{
+  const r=mkR('c-output');if(!r)return;
+  const{renderer,scene,camera,canvas}=r;
+  camera.position.set(0,0.3,4.2);camera.lookAt(0,0,0);
+
+  /* lighting rig */
+  scene.add(new THREE.AmbientLight(0x080818,1.2));
+
+  const key=new THREE.DirectionalLight(0xc8d4ff,2.5);key.position.set(3,5,4);scene.add(key);
+  const rim=new THREE.DirectionalLight(0x8070ff,2.0);rim.position.set(-4,2,-2);scene.add(rim);
+  const fill=new THREE.DirectionalLight(0x30ffcc,0.7);fill.position.set(0,-4,2);scene.add(fill);
+
+  /* three orbiting point lights */
+  const orbs=[];
+  [{c:0x8b7ff8,r:3.3,s:0.42,ph:0},{c:0x40e8d0,r:3.0,s:0.6,ph:2.1},{c:0xff5a5a,r:3.5,s:0.28,ph:4.2}].forEach(o=>{
+    const pl=new THREE.PointLight(o.c,3,12);scene.add(pl);orbs.push({pl,...o});
+  });
+
+  /* ── shoe-last form via distorted icosahedron ── */
+  const group=new THREE.Group();
+
+  const bodyGeo=new THREE.IcosahedronGeometry(1.0,7);
+  const bPos=bodyGeo.attributes.position;
+  const origB=new Float32Array(bPos.array);
+
+  /* initial shape distortion */
+  for(let i=0;i<bPos.count;i++){
+    const x=origB[i*3],y=origB[i*3+1],z=origB[i*3+2];
+    bPos.setXYZ(i, x*1.58+z*0.18, y*0.68-0.1, z*0.82+y*0.12);
+  }
+  bodyGeo.computeVertexNormals();
+
+  const bodyMat=new THREE.MeshStandardMaterial({color:0x141428,metalness:0.96,roughness:0.06});
+  const body=new THREE.Mesh(bodyGeo,bodyMat);group.add(body);
+
+  /* live morphing: store new orig after shape distortion */
+  const morphOrig=new Float32Array(bPos.array);
+
+  /* sole disc */
+  const soleGeo=new THREE.CylinderGeometry(0.9,0.97,0.17,52);
+  const sPos=soleGeo.attributes.position;
+  for(let i=0;i<sPos.count;i++){sPos.setX(i,sPos.getX(i)*1.72);sPos.setZ(i,sPos.getZ(i)*0.86);}
+  soleGeo.computeVertexNormals();
+  const sole=new THREE.Mesh(soleGeo,new THREE.MeshStandardMaterial({color:0x181840,metalness:0.65,roughness:0.28}));
+  sole.position.y=-0.8;group.add(sole);
+
+  /* midsole stripe */
+  const midGeo=new THREE.CylinderGeometry(0.92,0.92,0.075,52);
+  const mPos=midGeo.attributes.position;
+  for(let i=0;i<mPos.count;i++){mPos.setX(i,mPos.getX(i)*1.73);mPos.setZ(i,mPos.getZ(i)*0.87);}
+  midGeo.computeVertexNormals();
+  const midMat=new THREE.MeshStandardMaterial({color:0x8b7ff8,metalness:0.82,roughness:0.18,emissive:0x3020c0,emissiveIntensity:0.35});
+  const mid=new THREE.Mesh(midGeo,midMat);mid.position.y=-0.67;group.add(mid);
+
+  /* wireframe overlay */
+  const wGeo=new THREE.IcosahedronGeometry(1.04,3);
+  const wPos=wGeo.attributes.position;
+  for(let i=0;i<wPos.count;i++){wPos.setXYZ(i,wPos.getX(i)*1.6,wPos.getY(i)*0.7-0.1,wPos.getZ(i)*0.84+wPos.getY(i)*0.12);}
+  wGeo.computeVertexNormals();
+  const wire=new THREE.Mesh(wGeo,new THREE.MeshBasicMaterial({color:0x8b7ff8,wireframe:true,transparent:true,opacity:0.07}));
+  group.add(wire);
+
+  /* UV ring lines */
+  for(let i=0;i<6;i++){
+    const rg=new THREE.TorusGeometry(0.96-i*0.03,0.004,8,90);
+    const rm=new THREE.MeshBasicMaterial({color:0x9080ff,transparent:true,opacity:0.11-i*0.012});
+    const ring=new THREE.Mesh(rg,rm);
+    ring.rotation.x=Math.PI/2;ring.position.y=-0.62+i*0.3;ring.scale.set(1.62,1.62,0.88);
+    group.add(ring);
+  }
+
+  group.rotation.y=0.5;group.rotation.x=-0.12;
+  scene.add(group);
+
+  /* scan plane */
+  const scanGeo=new THREE.PlaneGeometry(4,0.04);
+  const scanMat=new THREE.MeshBasicMaterial({color:0x8b7ff8,transparent:true,opacity:0.5,side:THREE.DoubleSide});
+  const scanPlane=new THREE.Mesh(scanGeo,scanMat);
+  scanPlane.rotation.x=Math.PI/2;scene.add(scanPlane);
+
+  /* feature point cloud */
+  const N=220;
+  const ptGeo=new THREE.BufferGeometry();
+  const ptPos=new Float32Array(N*3),ptCol=new Float32Array(N*3);
+  for(let i=0;i<N;i++){
+    const th=Math.random()*Math.PI*2,ph=Math.acos(2*Math.random()-1);
+    const rr=1.08+Math.random()*0.45;
+    ptPos[i*3]=rr*Math.sin(ph)*Math.cos(th)*1.58;
+    ptPos[i*3+1]=rr*Math.sin(ph)*Math.sin(th)*0.7-0.1;
+    ptPos[i*3+2]=rr*Math.cos(ph)*0.84;
+    const tt=Math.random();
+    ptCol[i*3]=0.54-tt*0.16;ptCol[i*3+1]=0.50+tt*0.42;ptCol[i*3+2]=0.97-tt*0.4;
+  }
+  ptGeo.setAttribute('position',new THREE.BufferAttribute(ptPos,3));
+  ptGeo.setAttribute('color',new THREE.BufferAttribute(ptCol,3));
+  const pts=new THREE.Points(ptGeo,new THREE.PointsMaterial({size:0.03,vertexColors:true,transparent:true,opacity:0.65}));
+  scene.add(pts);
+
+  /* drag */
+  let drag=false,lx=0,ly=0,vx=0,vy=0,ry=0.5,rx=-0.12;
+  canvas.addEventListener('mousedown',e=>{drag=true;lx=e.clientX;ly=e.clientY;});
+  canvas.addEventListener('touchstart',e=>{drag=true;lx=e.touches[0].clientX;ly=e.touches[0].clientY;},{passive:true});
+  window.addEventListener('mouseup',()=>drag=false);
+  window.addEventListener('touchend',()=>drag=false);
+  window.addEventListener('mousemove',e=>{if(!drag)return;vx=(e.clientX-lx)*.007;vy=(e.clientY-ly)*.007;ry+=vx;rx+=vy;lx=e.clientX;ly=e.clientY;},{passive:true});
+  window.addEventListener('touchmove',e=>{if(!drag||!e.touches[0])return;vx=(e.touches[0].clientX-lx)*.007;vy=(e.touches[0].clientY-ly)*.007;ry+=vx;rx+=vy;lx=e.touches[0].clientX;ly=e.touches[0].clientY;},{passive:true});
+
+  /* animate */
+  let t=0,scanY=-1.4,scanDir=1;
+  (function loop(){
+    requestAnimationFrame(loop);t+=0.011;
+
+    /* orb lights */
+    orbs.forEach(o=>{
+      const a=t*o.s+o.ph;
+      o.pl.position.set(Math.cos(a)*o.r,1.5+Math.sin(t*0.35)*0.5,Math.sin(a)*o.r);
+    });
+
+    /* subtle mesh morph */
+    for(let i=0;i<bPos.count;i++){
+      const ox=morphOrig[i*3],oy=morphOrig[i*3+1],oz=morphOrig[i*3+2];
+      const l=Math.sqrt(ox*ox+oy*oy+oz*oz)||1;
+      const n=Math.sin(ox/l*2.5+t)*Math.cos(oy/l*2.5+t*.7)*Math.sin(oz/l*2.5+t*.5);
+      const s=1+n*.065;
+      bPos.setXYZ(i,ox*s,oy*s,oz*s);
+    }
+    bPos.needsUpdate=true;bodyGeo.computeVertexNormals();
+
+    /* scan */
+    scanY+=scanDir*0.02;
+    if(scanY>1.35||scanY<-1.35)scanDir*=-1;
+    scanPlane.position.y=scanY;
+    scanMat.opacity=0.28+0.22*Math.sin(t*3.5);
+
+    /* midsole pulse */
+    midMat.emissiveIntensity=0.2+0.28*Math.sin(t*2.2);
+
+    /* inertia */
+    if(!drag){vx*=0.92;vy*=0.92;ry+=vx+0.005;rx+=vy;rx=Math.max(-0.55,Math.min(0.55,rx));}
+    group.rotation.y=ry;group.rotation.x=rx;
+    wire.rotation.y=ry+t*0.025;
+    pts.rotation.y=t*0.04;
+
+    renderer.render(scene,camera);
+  })();
+})();
+
+/* ─── Feature bento ─── */
+(()=>{
+  const r=mkR('c-feat1');if(!r)return;
+  const{renderer,scene,camera}=r;
+  camera.position.set(0,1.5,6);camera.lookAt(0,0,0);
+  scene.add(new THREE.AmbientLight(0xffffff,.2));
+  const k=new THREE.DirectionalLight(0xffffff,1);k.position.set(4,4,4);scene.add(k);
+  const p=new THREE.PointLight(0x8b7ff8,2,20);p.position.set(-2,2,3);scene.add(p);
+  const geo=new THREE.TorusKnotGeometry(1,.32,200,20,2,3);
+  const mat=new THREE.MeshStandardMaterial({color:0x131320,metalness:.9,roughness:.1});
+  const tk=new THREE.Mesh(geo,mat);scene.add(tk);
+  scene.add(new THREE.Mesh(geo,new THREE.MeshBasicMaterial({color:0x8b7ff8,wireframe:true,transparent:true,opacity:.08})));
+  for(let i=0;i<3;i++){const rg=new THREE.TorusGeometry(2+i*.6,.006,8,100);const rm=new THREE.MeshBasicMaterial({color:0x8b7ff8,transparent:true,opacity:.1-i*.025});const ring=new THREE.Mesh(rg,rm);ring.rotation.x=Math.PI/2;ring.rotation.z=i*.5;scene.add(ring);}
+  let t=0;(function a(){requestAnimationFrame(a);t+=.005;tk.rotation.y=t;tk.rotation.x=t*.4;renderer.render(scene,camera);})();
+})();
+
+
+/* ═══════════════════════════════════════════════════
+
+/* ═══════════════════════════════════════════════════════
+   SHOWCASE — Pure Canvas 2D pseudo-3D cartoon characters
+   Guaranteed rendering, zero dependencies
+   White clay by default → click for full colour
+════════════════════════════════════════════════════════ */
+(function() {
+  'use strict';
+
+  var models = [
+    { id: 'sc1', label: 'Pikachu',  draw: drawPikachu,  bg: '#0c0c1e' },
+    { id: 'sc2', label: 'Robot',    draw: drawRobot,    bg: '#080c18' },
+    { id: 'sc3', label: 'Dragon',   draw: drawDragon,   bg: '#140808' }
+  ];
+
+  var states = {};
+
+  function init() {
+    models.forEach(function(m) {
+      var canvas = document.getElementById(m.id);
+      if (!canvas) return;
+      var wrap = canvas.parentElement;
+      if (!wrap) return;
+
+      states[m.id] = { coloured: true, angle: 0 };
+
+      /* size canvas */
+      function resize() {
+        var w = wrap.clientWidth  || 300;
+        var h = wrap.clientHeight || 300;
+        canvas.width  = w;
+        canvas.height = h;
+      }
+      resize();
+      window.addEventListener('resize', resize);
+
+      /* animate */
+      (function loop() {
+        requestAnimationFrame(loop);
+        var st = states[m.id];
+        st.angle += 0.018;
+        var ctx = canvas.getContext('2d');
+        var W = canvas.width, H = canvas.height;
+        if (!W || !H) { resize(); return; }
+
+        /* background */
+        ctx.fillStyle = m.bg;
+        ctx.fillRect(0, 0, W, H);
+
+        /* subtle grid */
+        ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+        ctx.lineWidth = 1;
+        for (var gx = 0; gx < W; gx += 40) { ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,H); ctx.stroke(); }
+        for (var gy = 0; gy < H; gy += 40) { ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(W,gy); ctx.stroke(); }
+
+        /* floor reflection shadow */
+        var sx = W/2, sy = H * 0.82;
+        var sg = ctx.createRadialGradient(sx, sy, 2, sx, sy, W*0.28);
+        sg.addColorStop(0, 'rgba(139,127,248,0.18)');
+        sg.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = sg;
+        ctx.beginPath(); ctx.ellipse(sx, sy, W*0.28, H*0.07, 0, 0, Math.PI*2); ctx.fill();
+
+        /* draw character centred */
+        ctx.save();
+        ctx.translate(W/2, H/2 + Math.sin(st.angle * 1.1) * H * 0.025);
+        var sc = Math.min(W, H) / 340;
+        ctx.scale(sc, sc);
+        m.draw(ctx, st.angle, st.coloured);
+        ctx.restore();
+
+      })();
+    });
+  }
+
+  /* colour helper: returns colour or white-clay */
+  function col(c, colour, clay) {
+    return c ? colour : (clay || '#e8e8e8');
+  }
+
+  /* ─── ellipse shorthand ─── */
+  function ell(ctx, x, y, rx, ry, col) {
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  /* ══════════════════════════════════
+     PIKACHU — chunky cartoon lightning mouse
+  ══════════════════════════════════ */
+  function drawPikachu(ctx, t, c) {
+    var sc = col.bind(null, c);
+
+    /* lightning tail */
+    ctx.save();
+    ctx.strokeStyle = sc('#FFD700', '#d5d5d5');
+    ctx.lineWidth = 10; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-90, 50);
+    ctx.lineTo(-68, 18);
+    ctx.lineTo(-80, -5);
+    ctx.lineTo(-54, -22);
+    ctx.lineTo(-60, -42);
+    ctx.lineTo(-38, -55);
+    ctx.stroke();
+    /* tail tip cone */
+    ctx.fillStyle = sc('#FFD700', '#d5d5d5');
+    ctx.beginPath();
+    ctx.moveTo(-38, -55); ctx.lineTo(-28, -75); ctx.lineTo(-20, -52); ctx.closePath(); ctx.fill();
+    ctx.restore();
+
+    /* ── body ── */
+    ell(ctx, 0, 28, 68, 72, sc('#FFD700','#ececec'));
+
+    /* tummy patch */
+    ell(ctx, 0, 42, 38, 32, sc('#FFF5B0','#dedede'));
+
+    /* ── left ear ── */
+    ctx.fillStyle = sc('#FFD700','#ececec');
+    ctx.beginPath(); ctx.moveTo(-44,-62); ctx.lineTo(-70,-130); ctx.lineTo(-18,-95); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = sc('#111111','#bbbbbb');
+    ctx.beginPath(); ctx.moveTo(-44,-66); ctx.lineTo(-64,-118); ctx.lineTo(-22,-92); ctx.closePath(); ctx.fill();
+
+    /* ── right ear ── */
+    ctx.fillStyle = sc('#FFD700','#ececec');
+    ctx.beginPath(); ctx.moveTo(44,-62); ctx.lineTo(70,-130); ctx.lineTo(18,-95); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = sc('#111111','#bbbbbb');
+    ctx.beginPath(); ctx.moveTo(44,-66); ctx.lineTo(64,-118); ctx.lineTo(22,-92); ctx.closePath(); ctx.fill();
+
+    /* ── head ── */
+    ell(ctx, 0, -50, 62, 58, sc('#FFD700','#ececec'));
+
+    /* cheek blush */
+    ell(ctx, -44, -32, 18, 13, sc('#FF6B8A','#cccccc'));
+    ell(ctx,  44, -32, 18, 13, sc('#FF6B8A','#cccccc'));
+
+    /* ── eyes ── */
+    ell(ctx, -24, -58, 11, 13, '#111111');
+    ell(ctx, -20, -63,  4,  4, '#ffffff');
+    ell(ctx,  24, -58, 11, 13, '#111111');
+    ell(ctx,  28, -63,  4,  4, '#ffffff');
+
+    /* nose */
+    ell(ctx, 0, -44, 7, 5, '#333');
+
+    /* smile */
+    ctx.strokeStyle = '#555'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(0, -38, 13, 0.25, Math.PI - 0.25); ctx.stroke();
+
+    /* ── arms ── */
+    ctx.save(); ctx.translate(-82, 15); ctx.rotate(0.4);
+    ell(ctx, 0, 0, 15, 28, sc('#FFD700','#ececec'));
+    ell(ctx, 0, 28, 18, 12, sc('#FFD700','#ececec'));
+    ctx.restore();
+    ctx.save(); ctx.translate(82, 15); ctx.rotate(-0.4 + Math.sin(t*2)*0.25);
+    ell(ctx, 0, 0, 15, 28, sc('#FFD700','#ececec'));
+    ell(ctx, 0, 28, 18, 12, sc('#FFD700','#ececec'));
+    ctx.restore();
+
+    /* ── legs ── */
+    ell(ctx, -32, 95, 18, 14, sc('#FFD700','#ececec'));
+    ell(ctx,  32, 95, 18, 14, sc('#FFD700','#ececec'));
+    ell(ctx, -32,112, 24, 10, sc('#FFD700','#ececec'));
+    ell(ctx,  32,112, 24, 10, sc('#FFD700','#ececec'));
+  }
+
+  /* ══════════════════════════════════
+     ROBOT — boxy sci-fi cartoon bot
+  ══════════════════════════════════ */
+  function drawRobot(ctx, t, c) {
+    var sc = col.bind(null, c);
+
+    /* ── legs ── */
+    ctx.fillStyle = sc('#2255CC','#d8d8d8');
+    roundBox(ctx, -46, 62, 36, 52, 8); ctx.fill();
+    roundBox(ctx,  10, 62, 36, 52, 8); ctx.fill();
+    /* boots */
+    ctx.fillStyle = sc('#3377EE','#e2e2e2');
+    roundBox(ctx, -52,108, 48, 20, 6); ctx.fill();
+    roundBox(ctx,   4,108, 48, 20, 6); ctx.fill();
+
+    /* ── torso ── */
+    ctx.fillStyle = sc('#3377EE','#e2e2e2');
+    roundBox(ctx, -58, -22, 116, 88, 14); ctx.fill();
+
+    /* chest panel */
+    ctx.fillStyle = sc('#1144BB','#cccccc');
+    roundBox(ctx, -38, -10,  76, 52, 8); ctx.fill();
+
+    /* chest light */
+    var glow = sc('#00FFEE','#bbbbbb');
+    ell(ctx, 0, 8, 14, 14, glow);
+    if (c) {
+      var gl = ctx.createRadialGradient(0,8,4,0,8,26);
+      gl.addColorStop(0,'rgba(0,255,238,0.4)'); gl.addColorStop(1,'rgba(0,255,238,0)');
+      ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(0,8,26,0,Math.PI*2); ctx.fill();
+    }
+
+    /* buttons */
+    var btns = [sc('#FF4444','#bbb'), sc('#FFAA00','#bbb'), sc('#44FF88','#bbb')];
+    [-22,0,22].forEach(function(bx,i){
+      ell(ctx, bx, 42, 7, 7, btns[i]);
+    });
+
+    /* ── shoulders ── */
+    ell(ctx, -72, -5, 20, 20, sc('#3377EE','#e2e2e2'));
+    ell(ctx,  72, -5, 20, 20, sc('#3377EE','#e2e2e2'));
+
+    /* ── arms ── */
+    /* left static */
+    ctx.save(); ctx.translate(-88, 18); ctx.rotate(0.2);
+    roundBox(ctx,-14,-30,28,58,10); ctx.fillStyle=sc('#3377EE','#e2e2e2'); ctx.fill();
+    ell(ctx,0,34,18,18,sc('#2255CC','#d0d0d0'));
+    ctx.restore();
+    /* right waving */
+    ctx.save(); ctx.translate(88, 18); ctx.rotate(-0.3 + Math.sin(t*2)*0.4);
+    ctx.fillStyle=sc('#3377EE','#e2e2e2');
+    roundBox(ctx,-14,-30,28,58,10); ctx.fill();
+    ell(ctx,0,34,18,18,sc('#2255CC','#d0d0d0'));
+    ctx.restore();
+
+    /* ── neck ── */
+    ctx.fillStyle = sc('#2255CC','#d0d0d0');
+    roundBox(ctx, -14,-38, 28, 18, 5); ctx.fill();
+
+    /* ── head ── */
+    ctx.fillStyle = sc('#3377EE','#e2e2e2');
+    roundBox(ctx, -52,-114,104, 78, 16); ctx.fill();
+
+    /* visor */
+    ctx.fillStyle = sc('#00BBFF','#c8d0e0');
+    roundBox(ctx, -38, -100, 76, 30, 8); ctx.fill();
+    /* visor shine */
+    ctx.fillStyle = 'rgba(255,255,255,0.18)';
+    roundBox(ctx, -34,-98, 68, 10, 4); ctx.fill();
+
+    /* eye left */
+    ell(ctx,-20,-85,10,12,'#ffffff');
+    ell(ctx,-20,-85, 6, 8,sc('#0033CC','#888'));
+    ell(ctx,-16,-89, 3, 3,'#ffffff');
+    /* eye right */
+    ell(ctx, 20,-85,10,12,'#ffffff');
+    ell(ctx, 20,-85, 6, 8,sc('#0033CC','#888'));
+    ell(ctx, 24,-89, 3, 3,'#ffffff');
+
+    /* ear panels */
+    ctx.fillStyle = sc('#2255CC','#d0d0d0');
+    roundBox(ctx,-66,-100,14,42,5); ctx.fill();
+    roundBox(ctx, 52,-100,14,42,5); ctx.fill();
+
+    /* antenna */
+    ctx.strokeStyle = sc('#3377EE','#d0d0d0'); ctx.lineWidth = 6; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(0,-114); ctx.lineTo(0,-148); ctx.stroke();
+    ell(ctx,0,-152,11,11,sc('#FF4444','#bbbbbb'));
+    if(c){
+      var ag=ctx.createRadialGradient(0,-152,3,0,-152,20);
+      ag.addColorStop(0,'rgba(255,80,80,0.5)');ag.addColorStop(1,'rgba(255,80,80,0)');
+      ctx.fillStyle=ag;ctx.beginPath();ctx.arc(0,-152,20,0,Math.PI*2);ctx.fill();
+    }
+  }
+
+  /* ══════════════════════════════════
+     DRAGON — fierce cartoon fire dragon
+  ══════════════════════════════════ */
+  function drawDragon(ctx, t, c) {
+    var sc = col.bind(null, c);
+    var wf = Math.sin(t * 1.6) * 22; /* wing flap degrees */
+
+    /* ── tail ── */
+    ctx.strokeStyle = sc('#FF4422','#e0e0e0');
+    ctx.lineWidth = 22; ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(20, 60);
+    ctx.quadraticCurveTo(90, 80, 85, 30);
+    ctx.quadraticCurveTo(82, 0, 65, -15);
+    ctx.stroke();
+    /* tail spike */
+    ctx.fillStyle = sc('#FF6600','#cccccc');
+    ctx.beginPath(); ctx.moveTo(65,-15); ctx.lineTo(88,-5); ctx.lineTo(72,-34); ctx.closePath(); ctx.fill();
+
+    /* ── wings ── */
+    /* left wing */
+    ctx.save();
+    ctx.translate(-46, -2);
+    ctx.rotate((-28 - wf) * Math.PI / 180);
+    ctx.fillStyle = sc('#CC2200','#d8d8d8');
+    ctx.beginPath();
+    ctx.moveTo(0,0); ctx.lineTo(-90,-22); ctx.lineTo(-72,35); ctx.lineTo(-36,55); ctx.lineTo(0,25);
+    ctx.closePath(); ctx.fill();
+    /* wing membrane lines */
+    ctx.strokeStyle = sc('#991100','#c8c8c8'); ctx.lineWidth = 2;
+    [[-25,-12,-60,28],[-12,-6,-40,40]].forEach(function(l){
+      ctx.beginPath(); ctx.moveTo(l[0],l[1]); ctx.lineTo(l[2],l[3]); ctx.stroke();
+    });
+    ctx.restore();
+
+    /* right wing */
+    ctx.save();
+    ctx.translate(46, -2);
+    ctx.rotate((28 + wf) * Math.PI / 180);
+    ctx.fillStyle = sc('#CC2200','#d8d8d8');
+    ctx.beginPath();
+    ctx.moveTo(0,0); ctx.lineTo(90,-22); ctx.lineTo(72,35); ctx.lineTo(36,55); ctx.lineTo(0,25);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = sc('#991100','#c8c8c8'); ctx.lineWidth = 2;
+    [[25,-12,60,28],[12,-6,40,40]].forEach(function(l){
+      ctx.beginPath(); ctx.moveTo(l[0],l[1]); ctx.lineTo(l[2],l[3]); ctx.stroke();
+    });
+    ctx.restore();
+
+    /* ── body ── */
+    ell(ctx, 0, 20, 62, 72, sc('#FF4422','#eeeeee'));
+
+    /* belly scales */
+    ell(ctx, 0, 28, 36, 46, sc('#FFCC88','#e0e0e0'));
+    /* belly lines */
+    ctx.strokeStyle = sc('#DDAA66','#d0d0d0'); ctx.lineWidth = 1.5;
+    [-18,-6,6,18].forEach(function(y){
+      ctx.beginPath(); ctx.moveTo(-28,y+20); ctx.lineTo(28,y+20); ctx.stroke();
+    });
+
+    /* ── legs ── */
+    ctx.save(); ctx.translate(-38, 75);
+    ell(ctx,0,0,15,22,sc('#FF4422','#eeeeee'));
+    /* claws */
+    ctx.fillStyle=sc('#882200','#cccccc');
+    [-10,0,10].forEach(function(cx){
+      ctx.beginPath();ctx.moveTo(cx,20);ctx.lineTo(cx-5,36);ctx.lineTo(cx+5,36);ctx.closePath();ctx.fill();
+    });
+    ctx.restore();
+    ctx.save(); ctx.translate(38, 75);
+    ell(ctx,0,0,15,22,sc('#FF4422','#eeeeee'));
+    ctx.fillStyle=sc('#882200','#cccccc');
+    [-10,0,10].forEach(function(cx){
+      ctx.beginPath();ctx.moveTo(cx,20);ctx.lineTo(cx-5,36);ctx.lineTo(cx+5,36);ctx.closePath();ctx.fill();
+    });
+    ctx.restore();
+
+    /* ── neck ── */
+    ell(ctx, 0, -48, 28, 32, sc('#FF4422','#eeeeee'));
+
+    /* ── head ── */
+    ell(ctx, 0, -92, 52, 48, sc('#FF4422','#eeeeee'));
+
+    /* ── snout ── */
+    ell(ctx, 0, -78, 30, 20, sc('#FF6644','#e5e5e5'));
+    /* nostrils */
+    ell(ctx,-11,-74, 5, 4, sc('#AA2200','#c0c0c0'));
+    ell(ctx, 11,-74, 5, 4, sc('#AA2200','#c0c0c0'));
+
+    /* ── eyes ── */
+    ell(ctx,-28,-98,15,16,sc('#FFFF00','#e0e0e0'));
+    ell(ctx,-28,-98, 9,10,'#111100');
+    ell(ctx,-24,-103, 4, 4,'#ffffff');
+    ell(ctx, 28,-98,15,16,sc('#FFFF00','#e0e0e0'));
+    ell(ctx, 28,-98, 9,10,'#111100');
+    ell(ctx, 32,-103, 4, 4,'#ffffff');
+
+    /* ── horns ── */
+    ctx.fillStyle = sc('#882200','#c8c8c8');
+    ctx.beginPath(); ctx.moveTo(-24,-132); ctx.lineTo(-36,-168); ctx.lineTo(-8,-138); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo( 24,-132); ctx.lineTo( 36,-168); ctx.lineTo(  8,-138); ctx.closePath(); ctx.fill();
+    /* small secondary horns */
+    ctx.fillStyle = sc('#AA3300','#c0c0c0');
+    ctx.beginPath(); ctx.moveTo(-38,-120); ctx.lineTo(-50,-148); ctx.lineTo(-24,-125); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo( 38,-120); ctx.lineTo( 50,-148); ctx.lineTo( 24,-125); ctx.closePath(); ctx.fill();
+
+    /* ── fire breath ── */
+    var fp = 0.5 + Math.sin(t * 4) * 0.45;
+    var fireColors = c
+      ? ['rgba(255,200,0,0.9)','rgba(255,120,0,0.7)','rgba(255,50,0,0.5)']
+      : ['rgba(220,220,220,0.6)','rgba(180,180,180,0.4)','rgba(150,150,150,0.3)'];
+    [30,22,14].forEach(function(r,i){
+      ell(ctx, 0, -68 - i*12, r*fp, (r+4)*fp, fireColors[i]);
+    });
+  }
+
+  /* ─── rounded box helper ─── */
+  function roundBox(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x+r, y);
+    ctx.lineTo(x+w-r, y); ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+    ctx.lineTo(x+w, y+h-r); ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+    ctx.lineTo(x+r, y+h); ctx.quadraticCurveTo(x, y+h, x, y+h-r);
+    ctx.lineTo(x, y+r); ctx.quadraticCurveTo(x, y, x+r, y);
+    ctx.closePath();
+  }
+
+  /* start after DOM is ready */
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+})();
+
+
+
+
+</script>
+
+
+</body>
+</html>

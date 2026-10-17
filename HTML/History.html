@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TriGenix — My History</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../CSS/StyleDrop.css">
+  <style>
+    .hist-page {
+      padding-top: calc(var(--nav-h) + 48px);
+      padding-bottom: 80px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-left: 20px;
+      padding-right: 20px;
+      background: radial-gradient(ellipse 70% 40% at 50% 0%, rgba(139,127,248,.07) 0%, transparent 65%);
+    }
+
+    .hist-header { text-align: center; margin-bottom: 40px; max-width: 660px; width: 100%; }
+    .hist-header h1 { font-size: clamp(1.5rem, 3vw, 2.2rem); font-weight: 700; letter-spacing: -.04em; line-height: 1.15; margin-bottom: .5rem; }
+    .hist-header h1 .grad { background: linear-gradient(135deg, #fff 20%, rgba(139,127,248,.85)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .hist-header p { font-size: .88rem; color: var(--sub); }
+
+    /* ── Stats strip ─────────────────────────────────────────── */
+    .hist-stats { display: flex; gap: 12px; flex-wrap: wrap; width: 100%; max-width: 900px; margin-bottom: 20px; }
+    .stat-chip { display: flex; flex-direction: column; gap: 2px; background: var(--surface); border: 1px solid var(--border2); border-radius: 10px; padding: 12px 18px; flex: 1; min-width: 120px; }
+    .stat-chip .sc-val { font-family: var(--mono); font-size: 1.3rem; font-weight: 700; color: var(--text); }
+    .stat-chip .sc-lbl { font-family: var(--mono); font-size: .62rem; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
+
+    .hist-meta { display: flex; align-items: center; justify-content: space-between; width: 100%; max-width: 900px; margin-bottom: 20px; gap: 12px; flex-wrap: wrap; }
+    .hist-user { font-family: var(--mono); font-size: .78rem; color: var(--sub); }
+    .hist-user span { color: var(--acc); }
+    .hist-actions { display: flex; gap: 8px; }
+
+    /* ── History cards ───────────────────────────────────────── */
+    .hist-list { width: 100%; max-width: 900px; display: flex; flex-direction: column; gap: 16px; }
+
+    .hist-card {
+      background: var(--surface); border: 1px solid var(--border2);
+      border-radius: var(--r); padding: 20px 22px;
+      transition: border-color .18s, transform .15s;
+      position: relative; cursor: pointer;
+    }
+    .hist-card:hover { border-color: rgba(139,127,248,.45); transform: translateY(-1px); }
+    .hist-card:hover .hc-expand-hint { opacity: 1; }
+
+    .hc-expand-hint {
+      position: absolute; top: 14px; right: 16px;
+      font-family: var(--mono); font-size: .6rem; color: var(--acc);
+      opacity: 0; transition: opacity .2s;
+      pointer-events: none;
+    }
+
+    .hc-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 10px; flex-wrap: wrap; }
+    .hc-date { font-family: var(--mono); font-size: .68rem; color: var(--muted); }
+    .hc-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+    .hc-badge { font-family: var(--mono); font-size: .62rem; padding: 3px 9px; border-radius: 5px; border: 1px solid var(--border2); background: var(--bg); color: var(--sub); }
+    .hc-badge .bv { color: var(--text); }
+    .hc-badge.method { border-color: rgba(139,127,248,.25); color: var(--acc); }
+    .hc-badge.wt     { border-color: rgba(74,222,128,.25);  color: var(--green); }
+    .hc-badge.noglb  { border-color: rgba(255,107,107,.2);  color: var(--red); opacity: .7; }
+
+    .hc-imgs { display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap; }
+    .hc-img-block { display: flex; flex-direction: column; gap: 4px; }
+    .hc-img-label { font-family: var(--mono); font-size: .56rem; color: var(--muted); text-align: center; text-transform: uppercase; letter-spacing: .08em; }
+    .hc-img { width: 90px; height: 90px; object-fit: cover; border-radius: 7px; border: 1px solid var(--border2); background: var(--bg); cursor: zoom-in; transition: border-color .15s, transform .15s; display: block; }
+    .hc-img:hover { border-color: var(--acc); transform: scale(1.04); }
+
+    .hc-views-row { display: flex; gap: 5px; flex-wrap: wrap; align-items: flex-start; }
+
+    .hc-actions {
+      display: flex; gap: 8px; margin-top: 16px; padding-top: 14px;
+      border-top: 1px solid var(--border); flex-wrap: wrap; align-items: center;
+    }
+    .hc-btn { padding: 7px 16px; border-radius: 7px; border: 1px solid var(--border2); background: transparent; color: var(--sub); font-family: var(--mono); font-size: .7rem; cursor: pointer; text-decoration: none; display: inline-block; transition: all .15s; }
+    .hc-btn:hover { color: var(--text); background: rgba(255,255,255,.04); }
+    .hc-btn.primary { background: var(--text); color: var(--bg); border-color: var(--text); font-weight: 700; }
+    .hc-btn.primary:hover { opacity: .88; }
+    .hc-btn.danger { border-color: rgba(255,107,107,.3); color: var(--red); }
+    .hc-btn.danger:hover { background: rgba(255,107,107,.08); border-color: rgba(255,107,107,.5); }
+
+    /* Delete confirm */
+    .del-confirm { display: none; position: absolute; inset: 0; background: rgba(10,10,10,.93); border-radius: var(--r); z-index: 10; align-items: center; justify-content: center; flex-direction: column; gap: 12px; }
+    .del-confirm.show { display: flex; }
+    .del-confirm p { font-size: .88rem; color: var(--sub); }
+    .del-confirm strong { color: var(--red); }
+    .del-btns { display: flex; gap: 10px; }
+
+    /* Rename */
+    .hc-label-display { font-family: var(--mono); font-size: .72rem; color: var(--acc); margin-bottom: 6px; min-height: 16px; }
+    .rename-row { display: none; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .rename-row.show { display: flex; }
+    .rename-input { flex: 1; background: var(--bg); border: 1px solid var(--acc); border-radius: 6px; padding: 6px 10px; color: var(--text); font-family: var(--font); font-size: .82rem; outline: none; }
+    .rename-save { padding: 6px 12px; border-radius: 6px; border: none; background: var(--acc); color: #fff; font-family: var(--mono); font-size: .7rem; font-weight: 700; cursor: pointer; transition: opacity .15s; }
+    .rename-save:hover { opacity: .85; }
+    .rename-cancel { padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border2); background: transparent; color: var(--muted); font-family: var(--mono); font-size: .7rem; cursor: pointer; }
+
+    /* Skeletons */
+    .skel { background: linear-gradient(90deg, var(--surface) 25%, rgba(255,255,255,.04) 50%, var(--surface) 75%); background-size: 200% 100%; animation: skel 1.4s ease infinite; border-radius: 6px; }
+    @keyframes skel { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+    .skel-card { height: 160px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 20px; display: flex; gap: 12px; }
+    .skel-sq  { width: 90px; height: 90px; border-radius: 7px; flex-shrink: 0; }
+    .skel-lines { flex: 1; display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+    .skel-line { height: 12px; }
+
+    /* Empty state */
+    .hist-empty { width: 100%; max-width: 900px; background: var(--surface); border: 1px dashed var(--border2); border-radius: var(--r); padding: 52px 30px; text-align: center; }
+    .hist-empty .e-icon { font-size: 2.5rem; margin-bottom: 12px; }
+    .hist-empty h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 6px; }
+    .hist-empty p  { font-size: .84rem; color: var(--sub); margin-bottom: 20px; }
+
+    /* ════════════════════════════════════════════════════════════
+       DETAIL PANEL — slide-up drawer
+    ════════════════════════════════════════════════════════════ */
+    .detail-overlay {
+      position: fixed; inset: 0; z-index: 800;
+      background: rgba(0,0,0,.72);
+      display: none; align-items: flex-end; justify-content: center;
+    }
+    .detail-overlay.open { display: flex; }
+
+    .detail-panel {
+      width: 100%; max-width: 960px;
+      max-height: 92vh;
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: 18px 18px 0 0;
+      overflow-y: auto;
+      padding: 0 0 40px;
+      transform: translateY(40px);
+      opacity: 0;
+      transition: transform .28s var(--ease), opacity .22s ease;
+    }
+    .detail-overlay.open .detail-panel {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    /* Sticky header inside panel */
+    .dp-header {
+      position: sticky; top: 0; z-index: 10;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 24px 16px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border2);
+      gap: 12px;
+    }
+    .dp-title {
+      font-family: var(--mono); font-size: .88rem;
+      color: var(--text); font-weight: 700;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .dp-close {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: var(--bg); border: 1px solid var(--border2);
+      color: var(--sub); font-size: 1rem;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; transition: background .15s, color .15s;
+    }
+    .dp-close:hover { background: rgba(255,107,107,.12); color: var(--red); border-color: rgba(255,107,107,.3); }
+
+    /* Panel body */
+    .dp-body { padding: 24px 24px 0; display: flex; flex-direction: column; gap: 28px; }
+
+    /* Info row */
+    .dp-info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 10px;
+    }
+    .dp-info-chip {
+      background: var(--bg); border: 1px solid var(--border2);
+      border-radius: 9px; padding: 11px 14px;
+      display: flex; flex-direction: column; gap: 3px;
+    }
+    .dp-info-chip .ic-label {
+      font-family: var(--mono); font-size: .58rem;
+      color: var(--muted); text-transform: uppercase; letter-spacing: .08em;
+    }
+    .dp-info-chip .ic-val {
+      font-family: var(--mono); font-size: .88rem;
+      color: var(--text); font-weight: 700;
+    }
+    .dp-info-chip .ic-val.accent { color: var(--acc); }
+    .dp-info-chip .ic-val.green  { color: var(--green); }
+    .dp-info-chip .ic-val.red    { color: var(--red); }
+
+    /* Section titles inside panel */
+    .dp-section-title {
+      font-family: var(--mono); font-size: .66rem;
+      color: var(--muted); letter-spacing: 1.5px;
+      text-transform: uppercase; margin-bottom: 12px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .dp-section-title::after { content: ''; flex: 1; height: 1px; background: var(--border2); }
+
+    /* Image grids inside panel */
+    .dp-img-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 10px;
+    }
+    .dp-img-tile {
+      background: var(--bg); border: 1px solid var(--border2);
+      border-radius: 9px; overflow: hidden;
+      cursor: zoom-in; transition: border-color .15s, transform .15s;
+    }
+    .dp-img-tile:hover { border-color: var(--acc); transform: scale(1.025); }
+    .dp-img-tile img { width: 100%; display: block; aspect-ratio: 1; object-fit: cover; }
+    .dp-img-tile .dp-tile-label {
+      font-family: var(--mono); font-size: .56rem; color: var(--muted);
+      padding: 4px 7px; border-top: 1px solid var(--border2);
+      text-align: center; background: var(--surface); text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
+    /* Depth toggle */
+    .dp-depth-toggle { display: flex; gap: 6px; margin-bottom: 12px; }
+    .dp-dtgl {
+      padding: 5px 13px; border-radius: 6px;
+      border: 1px solid var(--border2);
+      background: transparent; color: var(--muted);
+      font-size: .74rem; cursor: pointer; transition: all .15s;
+    }
+    .dp-dtgl.active { border-color: var(--acc2); color: var(--acc2); background: rgba(108,95,240,.07); }
+
+    /* Front input large preview */
+    .dp-front-preview {
+      display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap;
+    }
+    .dp-front-img {
+      width: 160px; height: 160px; object-fit: contain;
+      border-radius: 10px; border: 1px solid var(--border2);
+      background: var(--bg); cursor: zoom-in;
+      transition: border-color .15s;
+    }
+    .dp-front-img:hover { border-color: var(--acc); }
+    .dp-front-info { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 8px; justify-content: center; }
+    .dp-front-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-family: var(--mono); font-size: .66rem;
+      background: rgba(139,127,248,.1); color: var(--acc);
+      border: 1px solid rgba(139,127,248,.22);
+      border-radius: 99px; padding: .3rem .85rem;
+      width: fit-content;
+    }
+    .dp-action-row { display: flex; gap: 10px; flex-wrap: wrap; }
+
+    /* Lightbox */
+    .lb { position: fixed; inset: 0; z-index: 999; background: rgba(0,0,0,.93); display: none; align-items: center; justify-content: center; cursor: zoom-out; }
+    .lb.open { display: flex; }
+    .lb img { max-width: 90vw; max-height: 90vh; border-radius: 10px; }
+
+    /* Share URL row */
+    .share-url-row { display:none; margin-top:6px; padding:8px 10px; background:#0d0f14; border:1px solid rgba(139,127,248,.3); border-radius:6px; font-family:var(--mono); font-size:.62rem; color:var(--acc); align-items:center; gap:8px; flex-wrap:wrap; }
+    .share-url-row.show { display:flex; }
+    .share-url-input { flex:1; background:transparent; border:none; color:var(--acc); font-family:var(--mono); font-size:.62rem; outline:none; min-width:0; }
+  </style>
+</head>
+<body>
+
+<!-- ── Navigation ──────────────────────────────────────────────── -->
+<nav class="tg-nav">
+  <div class="tg-nav-left">
+    <a href="../HTML/trigenix.html" class="tg-logo">
+      <div class="tg-logo-mark">
+        <svg viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle class="tg-r1" cx="15" cy="15" r="4" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.5"/>
+          <circle class="tg-r2" cx="15" cy="15" r="4" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>
+          <circle class="tg-r3" cx="15" cy="15" r="4" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
+          <circle cx="15" cy="15" r="4" fill="white"/>
+        </svg>
+      </div>
+      TriGenix
+    </a>
+    <div class="tg-nav-links">
+      <a href="../HTML/trigenix.html">Home</a>
+      <a href="DropImage.html">Generate</a>
+      <a href="History.html" class="active">History</a>
+      <a href="Profile.html">Profile</a>
+      <a href="Print3D.html">Print</a>
+    </div>
+  </div>
+  <div class="tg-nav-right">
+    <span id="nav-user" style="font-size:.78rem;color:var(--sub);font-family:var(--mono);"></span>
+    <div class="tg-nav-sep"></div>
+    <a href="DropImage.html" class="tg-btn-ghost">+ New</a>
+    <button class="tg-btn-fill" id="nav-logout-btn" onclick="doLogout()" style="cursor:pointer;border:none;">Sign Out</button>
+  </div>
+</nav>
+
+<!-- ── Page ────────────────────────────────────────────────────── -->
+<div class="hist-page">
+  <div class="hist-header">
+    <div class="drop-badge" style="margin: 0 auto 1rem;">
+      <span class="drop-badge-dot"></span>
+      Your generation history
+    </div>
+    <h1><span class="grad">My 3D Generations</span></h1>
+    <p>Click any card to see full details — views, depths, geometry stats.</p>
+  </div>
+
+  <div class="hist-stats" id="hist-stats" style="display:none;">
+    <div class="stat-chip"><span class="sc-val" id="stat-total">—</span><span class="sc-lbl">Total generations</span></div>
+    <div class="stat-chip"><span class="sc-val" id="stat-glb">—</span><span class="sc-lbl">With 3D model</span></div>
+    <div class="stat-chip"><span class="sc-val" id="stat-avg">—</span><span class="sc-lbl">Avg process time</span></div>
+  </div>
+
+  <div class="hist-meta">
+    <div class="hist-user">Logged in as: <span id="meta-username">—</span></div>
+    <div class="hist-actions">
+      <a href="DropImage.html" class="tg-btn-fill" style="font-size:.78rem;padding:.4rem 1rem;">+ New Generation</a>
+    </div>
+  </div>
+
+  <div class="hist-list" id="hist-list">
+    <div class="skel-card" id="skel1">
+      <div class="skel skel-sq"></div>
+      <div class="skel-lines">
+        <div class="skel skel-line" style="width:40%"></div>
+        <div class="skel skel-line" style="width:70%"></div>
+        <div class="skel skel-line" style="width:55%"></div>
+      </div>
+    </div>
+    <div class="skel-card" id="skel2">
+      <div class="skel skel-sq"></div>
+      <div class="skel-lines">
+        <div class="skel skel-line" style="width:35%"></div>
+        <div class="skel skel-line" style="width:65%"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     DETAIL PANEL
+════════════════════════════════════════════════════════════════ -->
+<div class="detail-overlay" id="detail-overlay" onclick="closeDetail(event)">
+  <div class="detail-panel" id="detail-panel">
+
+    <div class="dp-header">
+      <div class="dp-title" id="dp-title">Generation Details</div>
+      <button class="dp-close" onclick="closeDetailBtn()">✕</button>
+    </div>
+
+    <div class="dp-body" id="dp-body">
+      <!-- filled by JS -->
+    </div>
+
+  </div>
+</div>
+
+<!-- Lightbox -->
+<div class="lb" id="lb"><img id="lb-img" src="" alt=""></div>
+
+<script>
+'use strict';
+
+/* XSS-safe HTML escape — wrap every server/user value before innerHTML */
+function esc(v) {
+  if (v == null) return '';
+  return String(v)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+
+var _token    = localStorage.getItem('tg_token')    || '';
+var _username = localStorage.getItem('tg_username') || '';
+var _history  = [];         // full data cache
+var _depthMode = 'color';   // 'color' | 'grey'
+
+if (!_token) { window.location.href = '/HTML/Login.html'; }
+
+document.getElementById('nav-user').textContent     = _username;
+document.getElementById('meta-username').textContent = _username;
+
+function authUrl(url) {
+  if (!url) return url;
+  var isGenerated = url.indexOf('/generated/') === 0 ||
+    url.indexOf(window.location.origin + '/generated/') === 0;
+  if (!isGenerated || url.indexOf('token=') >= 0) return url;
+  return url + (url.indexOf('?') >= 0 ? '&' : '?') + 'token=' + encodeURIComponent(_token);
+}
+
+function absoluteAuthUrl(url) {
+  if (!url) return url;
+  return authUrl(url.indexOf('http') === 0 ? url : window.location.origin + url);
+}
+
+/* ── Auth ───────────────────────────────────────────────────── */
+function doLogout() {
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', '/auth/logout', true);
+  xhr.setRequestHeader('Authorization', 'Bearer ' + _token);
+  xhr.onload = xhr.onerror = function() {
+    localStorage.removeItem('tg_token');
+    localStorage.removeItem('tg_username');
+    window.location.href = '/HTML/Login.html';
+  };
+  xhr.send();
+}
+
+/* ── Stats ──────────────────────────────────────────────────── */
+function loadStats() {
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', '/auth/profile', true);
+  xhr.setRequestHeader('Authorization', 'Bearer ' + _token);
+  xhr.onload = function() {
+    try {
+      var d = JSON.parse(xhr.responseText);
+      if (!d.ok) return;
+      var s = d.stats || {};
+      document.getElementById('stat-total').textContent = s.total_generations || 0;
+      document.getElementById('stat-glb').textContent   = s.with_glb || 0;
+      document.getElementById('stat-avg').textContent   = s.avg_time ? s.avg_time + 's' : '—';
+      document.getElementById('hist-stats').style.display = 'flex';
+    } catch(e) {}
+  };
+  xhr.send();
+}
+
+/* ── Load history ───────────────────────────────────────────── */
+function loadHistory() {
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', '/auth/history', true);
+  xhr.setRequestHeader('Authorization', 'Bearer ' + _token);
+  xhr.onload = function() {
+    var s1 = document.getElementById('skel1');
+    var s2 = document.getElementById('skel2');
+    if (s1) s1.remove();
+    if (s2) s2.remove();
+    try {
+      var d = JSON.parse(xhr.responseText);
+      if (!d.ok) {
+        localStorage.removeItem('tg_token');
+        localStorage.removeItem('tg_username');
+        window.location.href = '/HTML/Login.html';
+        return;
+      }
+      _history = d.history || [];
+      _renderHistory(_history);
+    } catch(e) {
+      document.getElementById('hist-list').innerHTML =
+        '<div class="result-err"><h3>Error</h3><p>Failed to load history.</p></div>';
+    }
+  };
+  xhr.onerror = function() {
+    document.getElementById('hist-list').innerHTML =
+      '<div class="result-err"><h3>Error</h3><p>Cannot reach server.</p></div>';
+  };
+  xhr.send();
+}
+
+/* ── Render card list ───────────────────────────────────────── */
+function _renderHistory(items) {
+  var list = document.getElementById('hist-list');
+  if (!items || items.length === 0) {
+    list.innerHTML =
+      '<div class="hist-empty">' +
+        '<div class="e-icon">🧊</div>' +
+        '<h3>No generations yet</h3>' +
+        '<p>Drop an image to generate your first 3D model.</p>' +
+        '<a href="DropImage.html" class="tg-btn-fill" style="font-size:.82rem;padding:.5rem 1.4rem;display:inline-block;">Generate Now →</a>' +
+      '</div>';
+    return;
+  }
+  list.innerHTML = items.map(function(item) { return _cardHTML(item); }).join('');
+}
+
+function _cardHTML(item) {
+  var views  = (item.views        || []).map(authUrl);
+  var depths = (item.depths_color || []).map(authUrl);
+
+  var badges = '';
+  if (item.proc_time)
+    badges += '<div class="hc-badge">time: <span class="bv">' + esc(item.proc_time) + 's</span></div>';
+  if (item.vertices)
+    badges += '<div class="hc-badge">verts: <span class="bv">' + esc(Number(item.vertices).toLocaleString()) + '</span></div>';
+  if (item.faces)
+    badges += '<div class="hc-badge">faces: <span class="bv">' + esc(Number(item.faces).toLocaleString()) + '</span></div>';
+  if (item.method)
+    badges += '<div class="hc-badge method">' + esc(item.method) + '</div>';
+  if (item.print_ready || item.watertight)
+    badges += '<div class="hc-badge wt">print-ready ✓</div>';
+  if (!item.final_glb)
+    badges += '<div class="hc-badge noglb">no .glb</div>';
+
+  var inputImg  = authUrl(item.masked_image || item.input_image);
+  var mainThumb = inputImg
+    ? '<div class="hc-img-block"><div class="hc-img-label">Input</div><img class="hc-img" src="' + inputImg + '" loading="lazy" alt="input" onclick="event.stopPropagation();lbOpen(this.src)"></div>'
+    : '';
+
+  var showViews = views.slice(0, 3);
+  var viewImgs  = '';
+  if (showViews.length > 0) {
+    viewImgs =
+      '<div class="hc-img-block">' +
+        '<div class="hc-img-label">Views</div>' +
+        '<div class="hc-views-row">' +
+          showViews.map(function(v) {
+            return '<img class="hc-img" src="' + v + '" loading="lazy" alt="view" style="width:56px;height:56px;" onclick="event.stopPropagation();lbOpen(this.src)">';
+          }).join('') +
+          (views.length > 3
+            ? '<div style="width:56px;height:56px;border-radius:7px;background:var(--bg);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:.6rem;color:var(--muted);">+' + (views.length - 3) + '</div>'
+            : '') +
+        '</div>' +
+      '</div>';
+  }
+
+  var depthImg = depths[0]
+    ? '<div class="hc-img-block"><div class="hc-img-label">Depth</div><img class="hc-img" src="' + depths[0] + '" loading="lazy" alt="depth" onclick="event.stopPropagation();lbOpen(this.src)"></div>'
+    : '';
+
+  var labelDisplay = '<div class="hc-label-display" id="label-' + item.id + '">' + (item.label ? '📌 ' + esc(item.label) : '') + '</div>';
+  var renameRow =
+    '<div class="rename-row" id="rename-row-' + item.id + '">' +
+      '<input class="rename-input" id="rename-input-' + item.id + '" type="text" placeholder="Enter a name…" value="' + (item.label || '') + '" maxlength="80" onclick="event.stopPropagation()">' +
+      '<button class="rename-save" onclick="event.stopPropagation();doRename(' + item.id + ')">Save</button>' +
+      '<button class="rename-cancel" onclick="event.stopPropagation();hideRename(' + item.id + ')">✕</button>' +
+    '</div>';
+
+  var viewerBtn = '', downloadBtn = '', printBtn = '';
+  if (item.final_glb) {
+    var finalGlbUrl = authUrl(item.final_glb);
+    var vUrl = '/HTML/Viewer3d.html?model=' + encodeURIComponent(absoluteAuthUrl(item.final_glb)) + '&name=model.glb';
+    var pUrl = '/HTML/Print3D.html?out_dir=' + encodeURIComponent(item.out_dir || '');
+    viewerBtn   = '<a class="hc-btn primary" href="' + vUrl + '" target="_blank" onclick="event.stopPropagation()">🧊 Open in 3D Viewer</a>';
+    downloadBtn = '<a class="hc-btn" href="' + finalGlbUrl + '" download="model.glb" onclick="event.stopPropagation()">⬇ Download .glb</a>';
+    printBtn    = '<a class="hc-btn" href="' + pUrl + '" onclick="event.stopPropagation()">Send to Printer</a>';
+  }
+  var renameBtn = '<button class="hc-btn" onclick="event.stopPropagation();showRename(' + item.id + ')">✏️ Rename</button>';
+  var deleteBtn = '<button class="hc-btn danger" onclick="event.stopPropagation();confirmDelete(' + item.id + ')">🗑 Delete</button>';
+  var shareBtn  = '<button class="hc-btn" onclick="event.stopPropagation();doShare(' + item.id + ')">🔗 Share</button>';
+  var shareRow  = '<div class="share-url-row" id="share-row-' + item.id + '"><input class="share-url-input" id="share-url-' + item.id + '" readonly><button class="hc-btn" onclick="event.stopPropagation();copyShare(' + item.id + ')">Copy</button><button class="hc-btn danger" onclick="event.stopPropagation();revokeShare(' + item.id + ')">Revoke</button></div>';
+
+  return (
+    '<div class="hist-card" id="card-' + item.id + '" onclick="openDetail(' + item.id + ')">' +
+      '<div class="hc-expand-hint">Click for full details →</div>' +
+      '<div class="del-confirm" id="del-' + item.id + '">' +
+        '<p>Delete this generation?<br><strong>This will remove all files permanently.</strong></p>' +
+        '<div class="del-btns">' +
+          '<button class="hc-btn danger" onclick="event.stopPropagation();doDelete(' + item.id + ')">Yes, delete</button>' +
+          '<button class="hc-btn" onclick="event.stopPropagation();cancelDelete(' + item.id + ')">Cancel</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="hc-top">' +
+        '<div class="hc-date">🕐 ' + esc(item.created_fmt || '') + '</div>' +
+        '<div class="hc-badges">' + badges + '</div>' +
+      '</div>' +
+      labelDisplay + renameRow +
+      '<div class="hc-imgs">' + mainThumb + viewImgs + depthImg + '</div>' +
+      '<div class="hc-actions">' + viewerBtn + downloadBtn + printBtn + renameBtn + deleteBtn + shareBtn + '</div>' +
+      shareRow +
+    '</div>'
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   DETAIL PANEL
+════════════════════════════════════════════════════════════════ */
+
+function openDetail(id) {
+  var item = null;
+  for (var i = 0; i < _history.length; i++) {
+    if (_history[i].id === id) { item = _history[i]; break; }
+  }
+  if (!item) return;
+
+  var views       = (item.views        || []).map(authUrl);
+  var depthsColor = (item.depths_color || []).map(authUrl);
+  var depthsGrey  = (item.depths_grey  || []).map(authUrl);
+  var inputImg    = authUrl(item.masked_image || item.input_image || '');
+
+  /* ── Header title ── */
+  var title = item.label || ('Generation #' + item.id);
+  document.getElementById('dp-title').textContent = title;  // textContent is already safe
+
+  /* ── Info chips ── */
+  var chips = [
+    { label: 'Date',       val: item.created_fmt || '—',                    cls: '' },
+    { label: 'Process time', val: item.proc_time ? item.proc_time + 's' : '—', cls: 'accent' },
+    { label: 'Method',     val: item.method      || '—',                    cls: 'accent' },
+    { label: 'Vertices',   val: item.vertices    ? Number(item.vertices).toLocaleString() : '—', cls: '' },
+    { label: 'Faces',      val: item.faces       ? Number(item.faces).toLocaleString()    : '—', cls: '' },
+    { label: 'Print-ready', val: (item.print_ready || item.watertight) ? 'Yes ✓' : 'No', cls: (item.print_ready || item.watertight) ? 'green' : 'red' },
+    { label: 'Print status', val: item.print_status || '—', cls: item.print_status ? 'accent' : '' },
+    { label: 'STL',        val: item.stl_path ? 'exported ✓' : '—', cls: item.stl_path ? 'green' : '' },
+    { label: 'Views',      val: views.length     + ' generated',            cls: '' },
+    { label: 'Depth maps', val: depthsColor.length + ' maps',               cls: '' },
+  ];
+
+  var chipsHtml = chips.map(function(c) {
+    return '<div class="dp-info-chip"><span class="ic-label">' + c.label + '</span><span class="ic-val ' + c.cls + '">' + esc(c.val) + '</span></div>';
+  }).join('');
+
+  /* ── Front view preview + actions ── */
+  var frontHtml = '';
+  if (inputImg) {
+    var vUrl = '', dlBtn = '';
+    if (item.final_glb) {
+      vUrl  = '/HTML/Viewer3d.html?model=' + encodeURIComponent(absoluteAuthUrl(item.final_glb)) + '&name=model.glb';
+      dlBtn = '<a class="hc-btn" href="' + authUrl(item.final_glb) + '" download="model.glb">⬇ Download .glb</a>';
+    }
+    var viewBtn = item.final_glb
+      ? '<a class="hc-btn primary" href="' + vUrl + '" target="_blank">🧊 Open in 3D Viewer</a>'
+      : '<span style="font-size:.8rem;color:var(--muted);font-family:var(--mono);">No .glb yet</span>';
+
+    frontHtml =
+      '<div>' +
+        '<div class="dp-section-title">Input image</div>' +
+        '<div class="dp-front-preview">' +
+          '<img class="dp-front-img" src="' + inputImg + '" alt="input" onclick="lbOpen(this.src)">' +
+          '<div class="dp-front-info">' +
+            '<div class="dp-front-badge"><span>🧊</span> 3D Generation</div>' +
+            '<div style="font-size:.82rem;color:var(--sub);line-height:1.6;">Generated on ' + esc(item.created_fmt || '—') + '<br>Method: <span style="color:var(--acc);font-family:var(--mono);">' + esc(item.method || 'visual_hull') + '</span></div>' +
+            '<div class="dp-action-row">' + viewBtn + dlBtn + '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+  }
+
+  /* ── Views grid ── */
+  var viewsHtml = '';
+  if (views.length > 0) {
+    var VIEW_LABELS = ['Az 30° El +20°','Az 90° El -10°','Az 150° El +20°','Az 210° El -10°','Az 270° El +20°','Az 330° El -10°'];
+    viewsHtml =
+      '<div>' +
+        '<div class="dp-section-title">Generated views (' + views.length + ')</div>' +
+        '<div class="dp-img-grid">' +
+          views.map(function(v, i) {
+            return '<div class="dp-img-tile" onclick="lbOpen(\'' + v + '\')">' +
+              '<img src="' + v + '" loading="lazy" alt="view ' + i + '">' +
+              '<div class="dp-tile-label">' + (VIEW_LABELS[i] || 'View ' + i) + '</div>' +
+            '</div>';
+          }).join('') +
+        '</div>' +
+      '</div>';
+  }
+
+  /* ── Depth maps grid ── */
+  var depthsHtml = '';
+  var activeDm   = _depthMode === 'color' ? depthsColor : depthsGrey;
+  var DEPTH_LABELS = ['Front (input)','View 1','View 2','View 3','View 4','View 5','View 6'];
+  if (depthsColor.length > 0) {
+    depthsHtml =
+      '<div>' +
+        '<div class="dp-section-title">Depth maps (' + depthsColor.length + ')</div>' +
+        '<div class="dp-depth-toggle">' +
+          '<button class="dp-dtgl' + (_depthMode==='color'?' active':'') + '" id="dp-dtgl-color" onclick="dpToggleDepth(\'color\')">Colour</button>' +
+          '<button class="dp-dtgl' + (_depthMode==='grey' ?' active':'') + '" id="dp-dtgl-grey"  onclick="dpToggleDepth(\'grey\')">Greyscale</button>' +
+        '</div>' +
+        '<div class="dp-img-grid" id="dp-depth-grid">' +
+          activeDm.map(function(d, i) {
+            return '<div class="dp-img-tile" onclick="lbOpen(\'' + d + '\')">' +
+              '<img src="' + d + '" loading="lazy" alt="depth ' + i + '">' +
+              '<div class="dp-tile-label">' + (DEPTH_LABELS[i] || 'Depth ' + i) + '</div>' +
+            '</div>';
+          }).join('') +
+        '</div>' +
+      '</div>';
+  }
+
+  /* ── Compose body ── */
+  document.getElementById('dp-body').innerHTML =
+    '<div>' +
+      '<div class="dp-section-title">Generation details</div>' +
+      '<div class="dp-info-grid">' + chipsHtml + '</div>' +
+    '</div>' +
+    frontHtml +
+    viewsHtml +
+    depthsHtml;
+
+  /* Store item id on panel for depth toggle */
+  document.getElementById('detail-panel').dataset.itemId = id;
+
+  /* Open */
+  document.getElementById('detail-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeDetail(e) {
+  /* close only when clicking the dim overlay, not the panel itself */
+  if (e.target === document.getElementById('detail-overlay')) closeDetailBtn();
+}
+function closeDetailBtn() {
+  document.getElementById('detail-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+/* Depth colour/grey toggle inside detail panel */
+window.dpToggleDepth = function(mode) {
+  _depthMode = mode;
+  var id   = parseInt(document.getElementById('detail-panel').dataset.itemId);
+  var item = null;
+  for (var i = 0; i < _history.length; i++) {
+    if (_history[i].id === id) { item = _history[i]; break; }
+  }
+  if (!item) return;
+
+  var maps   = (mode === 'color' ? (item.depths_color||[]) : (item.depths_grey||[])).map(authUrl);
+  var DEPTH_LABELS = ['Front (input)','View 1','View 2','View 3','View 4','View 5','View 6'];
+  var grid   = document.getElementById('dp-depth-grid');
+  if (grid) {
+    grid.innerHTML = maps.map(function(d, i) {
+      return '<div class="dp-img-tile" onclick="lbOpen(\'' + d + '\')">' +
+        '<img src="' + d + '" loading="lazy" alt="depth ' + i + '">' +
+        '<div class="dp-tile-label">' + (DEPTH_LABELS[i] || 'Depth ' + i) + '</div>' +
+      '</div>';
+    }).join('');
+  }
+  ['color','grey'].forEach(function(m) {
+    var btn = document.getElementById('dp-dtgl-' + m);
+    if (btn) btn.classList.toggle('active', m === mode);
+  });
+};
+
+/* ESC key closes panel */
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeDetailBtn();
+});
+
+/* ── Rename ─────────────────────────────────────────────────── */
+window.showRename = function(id) {
+  var row = document.getElementById('rename-row-' + id);
+  if (row) row.classList.add('show');
+  var inp = document.getElementById('rename-input-' + id);
+  if (inp) { inp.focus(); inp.select(); }
+};
+window.hideRename = function(id) {
+  var row = document.getElementById('rename-row-' + id);
+  if (row) row.classList.remove('show');
+};
+window.doRename = function(id) {
+  var inp = document.getElementById('rename-input-' + id);
+  if (!inp) return;
+  var label = inp.value.trim();
+  var xhr = new XMLHttpRequest();
+  xhr.open('POST', '/auth/history/rename', true);
+  xhr.setRequestHeader('Authorization', 'Bearer ' + _token);
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  xhr.onload = function() {
+    try {
+      var d = JSON.parse(xhr.responseText);
+      if (d.ok) {
+        /* Update cache */
+        for (var i = 0; i < _history.length; i++) {
+          if (_history[i].id === id) { _history[i].label = label; break; }
+        }
+        var lbl = document.getElementById('label-' + id);
+        if (lbl) lbl.textContent = label ? '📌 ' + label : '';
+        hideRename(id);
+      } else {
+        alert('Rename failed: ' + (d.error || 'unknown'));
+      }
+    } catch(e) { alert('Rename failed'); }
+  };
+  xhr.onerror = function() { alert('Cannot reach server'); };
+  xhr.send(JSON.stringify({ id: id, label: label }));
+};
+
+document.addEventListener('keydown', function(e) {
+  if (e.key !== 'Enter') return;
+  var active = document.activeElement;
+  if (active && active.classList.contains('rename-input')) {
+    var id = active.id.replace('rename-input-', '');
+    if (id) doRename(parseInt(id));
+  }
+});
+
+/* ── Delete ─────────────────────────────────────────────────── */
+window.confirmDelete = function(id) {
+  document.getElementById('del-' + id).classList.add('show');
+};
+window.cancelDelete = function(id) {
+  document.getElementById('del-' + id).classList.remove('show');
+};
+window.doDelete = function(id) {
+  var xhr = new XMLHttpRequest();
+  xhr.open('DELETE', '/auth/history', true);
+  xhr.setRequestHeader('Authorization', 'Bearer ' + _token);
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  xhr.onload = function() {
+    try {
+      var d = JSON.parse(xhr.responseText);
+      if (d.ok) {
+        /* Remove from cache */
+        _history = _history.filter(function(h) { return h.id !== id; });
+        var card = document.getElementById('card-' + id);
+        if (card) {
+          card.style.transition = 'opacity .3s, transform .3s';
+          card.style.opacity = '0';
+          card.style.transform = 'scale(.97)';
+          setTimeout(function() { card.remove(); }, 320);
+        }
+        loadStats();
+      } else {
+        alert('Delete failed: ' + (d.error || 'unknown error'));
+      }
+    } catch(e) { alert('Delete failed'); }
+  };
+  xhr.onerror = function() { alert('Cannot reach server'); };
+  xhr.send(JSON.stringify({ id: id }));
+};
+
+/* ── Share ──────────────────────────────────────────────────── */
+window.doShare = function(id) {
+  var row = document.getElementById('share-row-' + id);
+  var inp = document.getElementById('share-url-' + id);
+  if (row && row.classList.contains('show')) { if (inp) { inp.select(); } return; }
+  jpost('/share/create', {hist_id: id}, function(d) {
+    if (!d.ok) { alert('Share failed: ' + (d.error || 'unknown')); return; }
+    var url = window.location.origin + '/share/' + esc(d.token);
+    if (inp) inp.value = url;
+    if (row) row.classList.add('show');
+  });
+};
+window.copyShare = function(id) {
+  var inp = document.getElementById('share-url-' + id);
+  if (!inp) return;
+  inp.select();
+  try { document.execCommand('copy'); } catch(e) {}
+};
+window.revokeShare = function(id) {
+  var inp = document.getElementById('share-url-' + id);
+  var row = document.getElementById('share-row-' + id);
+  if (!inp || !inp.value) return;
+  var tok = inp.value.split('/share/')[1];
+  if (!tok) return;
+  jpost('/share/revoke', {token: tok}, function(d) {
+    if (d.ok) { if (row) row.classList.remove('show'); if (inp) inp.value = ''; }
+    else { alert('Revoke failed: ' + (d.error || 'unknown')); }
+  });
+};
+
+/* ── Lightbox ───────────────────────────────────────────────── */
+function lbOpen(src) {
+  document.getElementById('lb-img').src = src;
+  document.getElementById('lb').classList.add('open');
+}
+document.getElementById('lb').onclick = function() {
+  this.classList.remove('open');
+  document.getElementById('lb-img').src = '';
+};
+
+/* ── Init ───────────────────────────────────────────────────── */
+loadStats();
+loadHistory();
+</script>
+</body>
+</html>

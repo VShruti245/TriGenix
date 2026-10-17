@@ -1,0 +1,89 @@
+﻿# TriGenix — Git ignore rules
+
+# ── User data (NEVER commit) ────────────────────────────────────────────────
+generated/
+uploads/
+*.db
+*.db-shm
+*.db-wal
+
+# ── Model weights (too large, 100 MB – 5 GB each) ───────────────────────────
+weights/
+*.ckpt
+*.safetensors
+*.pth
+*.pt
+*.bin
+
+# ── Secrets ─────────────────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ── Python cache ─────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# ── Large media / build artefacts ────────────────────────────────────────────
+*.mp4
+*.zip
+*.tar.gz
+*.log
+
+# ── Kiro / IDE temp files ─────────────────────────────────────────────────────
+.kiro/
+.agents/
+.codex_build/
+.codex_synopsis/
+.codex-finalizer/
+.vscode/
+.idea/
+
+# ── One-off build scripts (not part of the project) ──────────────────────────
+build_poster.py
+build_final*.py
+make_chart.py
+make_composite.py
+extract_images.py
+inspect_*.py
+update_poster.py
+revise_trigenix_poster.py
+create_trigenix_project_deck.py
+patch_instantmesh.py
+check.py
+verify_fixes.py
+
+# ── Poster working copies (keep only final versions in docs/) ────────────────
+TriGenix_Poster_BlueTheme.pptx
+TriGenix_Poster_Final.pptx
+TriGenix_Poster_A3_Updated.pptx
+TriGenix_Poster_A4.pptx
+TriGenix_Poster_A4_Updated.pptx
+TriGenix_Exhibition_Poster.pptx
+TriGenix_Poster_Final2_Updated.pptx
+TriGenix_Poster_Final2_Updated_Technical.pptx
+
+# ── Plagiarism report (not for public repo) ──────────────────────────────────
+plagiarism report/
+Plagiarism Report.*
+
+# ── Misc ─────────────────────────────────────────────────────────────────────
+directory.txt
+poster_assets/
+.DS_Store
+Thumbs.db
+
+# ── Paper build artifacts ─────────────────────────────────────────────────────
+paper/*.pdf
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.toc
+paper/*.bbl
+paper/*.blg
+paper/*.synctex.gz

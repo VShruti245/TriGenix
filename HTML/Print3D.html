@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TriGenix - Send to Printer</title>
+  <link rel="stylesheet" href="../CSS/StyleDrop.css">
+  <style>
+    body { min-height: 100vh; background: #0b0c0f; color: var(--text); }
+    .print-shell { padding: calc(var(--nav-h) + 18px) 18px 24px; height: 100vh; display: grid; grid-template-columns: 330px 1fr 360px; gap: 14px; }
+    .print-pane { min-height: 0; background: #111318; border: 1px solid rgba(255,255,255,.12); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; }
+    .pane-head { padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,.1); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .pane-title { font-family: var(--mono); font-size: .68rem; letter-spacing: .12em; text-transform: uppercase; color: rgba(255,255,255,.72); }
+    .pane-body { padding: 14px; overflow: auto; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field label { font-family: var(--mono); font-size: .58rem; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.48); }
+    .field input, .field select { width: 100%; background: #0b0c0f; border: 1px solid rgba(255,255,255,.14); border-radius: 6px; color: var(--text); padding: 9px 10px; font-family: var(--mono); font-size: .72rem; outline: none; }
+    .field input:focus, .field select:focus { border-color: #69d8b6; }
+    .row3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .row2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-family: var(--mono); font-size: .68rem; color: rgba(255,255,255,.65); }
+    .toggle-row input { width: 16px; height: 16px; }
+    .btn { border: 1px solid rgba(255,255,255,.16); background: #171b22; color: var(--text); border-radius: 6px; padding: 10px 12px; font-family: var(--mono); font-size: .72rem; cursor: pointer; }
+    .btn:hover { border-color: rgba(255,255,255,.34); }
+    .btn.primary { background: #e8f8f2; color: #06100d; border-color: #e8f8f2; font-weight: 700; }
+    .btn.danger { color: #ff9a9a; border-color: rgba(255,90,90,.32); background: rgba(255,90,90,.08); }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .model-list { display: flex; flex-direction: column; gap: 8px; }
+    .model-item { text-align: left; border: 1px solid rgba(255,255,255,.1); background: #0d0f14; color: var(--text); border-radius: 7px; padding: 10px; cursor: pointer; }
+    .model-item.active { border-color: #69d8b6; background: rgba(105,216,182,.08); }
+    .mi-title { font-family: var(--mono); font-size: .72rem; color: #fff; }
+    .mi-meta { margin-top: 4px; font-family: var(--mono); font-size: .58rem; color: rgba(255,255,255,.46); }
+    .preview-wrap { position: relative; min-height: 0; background: #050608; }
+    .preview-wrap iframe { width: 100%; height: 100%; border: 0; display: block; }
+    .empty-preview { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,.35); font-family: var(--mono); font-size: .75rem; }
+    .status-box { border: 1px solid rgba(255,255,255,.1); border-radius: 7px; padding: 11px; background: #0d0f14; font-family: var(--mono); font-size: .7rem; line-height: 1.55; color: rgba(255,255,255,.72); white-space: pre-wrap; }
+    .check-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; background: #0d0f14; border: 1px solid rgba(255,255,255,.1); border-radius: 6px; font-family: var(--mono); font-size: .68rem; }
+    .ok { color: #69d8b6; } .warn { color: #ffd166; } .bad { color: #ff8a8a; }
+    @media (max-width: 980px) { .print-shell { height: auto; min-height: 100vh; grid-template-columns: 1fr; } .preview-wrap { height: 58vh; } }
+
+    /* Collapsible tool sections */
+    .tool-section { border:1px solid rgba(255,255,255,.08); border-radius:6px; overflow:hidden; margin-top:8px; }
+    .tool-header { padding:8px 10px; background:#0d0f14; cursor:pointer; font-family:var(--mono); font-size:.66rem; color:rgba(255,255,255,.6); display:flex; justify-content:space-between; }
+    .tool-header:hover { color:var(--text); }
+    .tool-body { padding:10px; display:none; flex-direction:column; gap:8px; }
+    .tool-body.open { display:flex; }
+  </style>
+</head>
+<body>
+<nav class="tg-nav">
+  <div class="tg-nav-left">
+    <a href="../HTML/trigenix.html" class="tg-logo">TriGenix</a>
+    <div class="tg-nav-links">
+      <a href="DropImage.html">Generate</a>
+      <a href="History.html">History</a>
+      <a href="Viewer3d.html">3D Viewer</a>
+      <a href="Print3D.html" class="active">Print</a>
+    </div>
+  </div>
+  <div class="tg-nav-right">
+    <button class="tg-btn-fill" onclick="logout()" style="border:0;cursor:pointer;">Sign Out</button>
+  </div>
+</nav>
+
+<main class="print-shell">
+  <section class="print-pane">
+    <div class="pane-head"><div class="pane-title">Model</div><button class="btn" onclick="loadHistory()">Refresh</button></div>
+    <div class="pane-body">
+      <div class="field">
+        <label>Generated models</label>
+        <div class="model-list" id="modelList"></div>
+      </div>
+      <div class="status-box" id="modelStatus">Loading history...</div>
+    </div>
+  </section>
+
+  <section class="print-pane preview-wrap">
+    <iframe id="viewerFrame" title="3D model preview"></iframe>
+    <div class="empty-preview" id="emptyPreview">Select a model</div>
+  </section>
+
+  <section class="print-pane">
+    <div class="pane-head"><div class="pane-title">Print Job</div><button class="btn" onclick="loadPrinters()">Printers</button></div>
+    <div class="pane-body">
+      <div class="field">
+        <label>Printer</label>
+        <select id="printerSelect"></select>
+      </div>
+      <div class="row3">
+        <div class="field"><label>X mm</label><input id="scaleX" type="number" min="1" step="0.1" value="80"></div>
+        <div class="field"><label>Y mm</label><input id="scaleY" type="number" min="1" step="0.1" value="80"></div>
+        <div class="field"><label>Z mm</label><input id="scaleZ" type="number" min="1" step="0.1" value="80"></div>
+      </div>
+      <label class="toggle-row">Linked scale <input id="linkedScale" type="checkbox" checked></label>
+      <div class="row2">
+        <div class="field"><label>Layer mm</label><input id="layerHeight" type="number" min="0.04" max="0.6" step="0.01" value="0.20"></div>
+        <div class="field"><label>Infill %</label><input id="infill" type="number" min="0" max="100" step="1" value="15"></div>
+      </div>
+      <label class="toggle-row">Supports <input id="supports" type="checkbox" checked></label>
+      <div class="field">
+        <label>Material</label>
+        <select id="material"><option>PLA</option><option>PETG</option><option>ABS</option><option>TPU</option></select>
+      </div>
+      <div id="checks">
+        <div class="check-row"><span>Print-ready mesh</span><span id="checkWatertight" class="warn">unknown</span></div>
+        <div class="check-row"><span>STL export</span><span id="checkStl" class="warn">unknown</span></div>
+        <div class="check-row"><span>Print status</span><span id="checkPrint" class="warn">idle</span></div>
+      </div>
+      <button class="btn primary" id="prepareBtn" onclick="preparePrint()" disabled>Prepare</button>
+      <button class="btn primary" id="startBtn" onclick="startPrint()" disabled>Start Print</button>
+      <button class="btn danger" id="cancelBtn" onclick="cancelPrint()" disabled>Cancel Print</button>
+      <div class="status-box" id="jobStatus">Select a model and configured printer.</div>
+
+      <!-- Hollow for printing -->
+      <div class="tool-section">
+        <div class="tool-header" onclick="toggleTool('hollow-body')">
+          Hollow for Printing <span>▼</span>
+        </div>
+        <div class="tool-body" id="hollow-body">
+          <div class="row2">
+            <div class="field"><label>Wall mm</label><input id="hollowWall" type="number" min="1" step="0.5" value="3.0"></div>
+            <div class="field"><label>Drain mm</label><input id="hollowDrain" type="number" min="2" step="0.5" value="4.0"></div>
+          </div>
+          <button class="btn primary" onclick="doHollow()">Create Hollow</button>
+          <div class="status-box" id="hollow-status" style="display:none;"></div>
+        </div>
+      </div>
+
+      <!-- Split for printing -->
+      <div class="tool-section">
+        <div class="tool-header" onclick="toggleTool('split-body')">
+          Split for Printing <span>▼</span>
+        </div>
+        <div class="tool-body" id="split-body">
+          <div class="row2">
+            <div class="field"><label>Bed W mm</label><input id="splitW" type="number" min="10" value="220"></div>
+            <div class="field"><label>Bed D mm</label><input id="splitD" type="number" min="10" value="220"></div>
+          </div>
+          <div class="field">
+            <label>Connector</label>
+            <select id="splitConn"><option value="pin">Pin</option><option value="dovetail">Dovetail</option></select>
+          </div>
+          <button class="btn primary" onclick="doSplit()">Split Model</button>
+          <div class="status-box" id="split-status" style="display:none;"></div>
+        </div>
+      </div>
+
+      <!-- Multi-color export -->
+      <div class="tool-section">
+        <div class="tool-header" onclick="toggleTool('multicolor-body')">
+          Multi-Color Export <span>▼</span>
+        </div>
+        <div class="tool-body" id="multicolor-body">
+          <div class="field">
+            <label>Format</label>
+            <select id="mcFormat"><option value="3mf">3MF (single file)</option><option value="stl_per_region">STL per region</option></select>
+          </div>
+          <button class="btn primary" onclick="doMulticolor()">Export Multi-Color</button>
+          <div class="status-box" id="mc-status" style="display:none;"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+function esc(v) {
+  if (v == null) return '';
+  return String(v)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+var token = localStorage.getItem('tg_token') || '';
+var selected = null;
+var preparedToken = '';
+var statusTimer = null;
+var initialOutDir = new URLSearchParams(location.search).get('out_dir') || '';
+function ge(id){ return document.getElementById(id); }
+function auth(xhr){ xhr.setRequestHeader('Authorization', 'Bearer ' + token); }
+function logout(){ localStorage.removeItem('tg_token'); localStorage.removeItem('tg_username'); location.href='/HTML/Login.html'; }
+function withToken(url){ return url + (url.indexOf('?') >= 0 ? '&' : '?') + 'token=' + encodeURIComponent(token); }
+function jget(url, cb){
+  var xhr = new XMLHttpRequest(); xhr.open('GET', url, true); auth(xhr);
+  xhr.onload = function(){ try{ cb(JSON.parse(xhr.responseText), xhr.status); }catch(e){ cb({ok:false,error:'Bad response'}, xhr.status); } };
+  xhr.onerror = function(){ cb({ok:false,error:'Network error'}, 0); };
+  xhr.send();
+}
+function jpost(url, data, cb){
+  var xhr = new XMLHttpRequest(); xhr.open('POST', url, true); auth(xhr); xhr.setRequestHeader('Content-Type','application/json');
+  xhr.onload = function(){ try{ cb(JSON.parse(xhr.responseText), xhr.status); }catch(e){ cb({ok:false,error:'Bad response'}, xhr.status); } };
+  xhr.onerror = function(){ cb({ok:false,error:'Network error'}, 0); };
+  xhr.send(JSON.stringify(data || {}));
+}
+function loadHistory(){
+  if(!token){ location.href='/HTML/Login.html'; return; }
+  jget('/auth/history', function(d){
+    if(!d.ok){ ge('modelStatus').textContent = d.error || 'History unavailable'; return; }
+    var models = (d.history || []).filter(function(x){ return x.final_glb; });
+    ge('modelList').innerHTML = models.map(function(item){
+      return '<button class="model-item" id="m'+item.id+'" onclick="selectModel('+item.id+')">' +
+        '<div class="mi-title">' + esc(item.label || ('Generation #'+item.id)) + '</div>' +
+        '<div class="mi-meta">' + esc(item.method || 'unknown') + ' | ' + esc(item.created_fmt || '') + '</div>' +
+      '</button>';
+    }).join('') || '<div class="status-box">No printable generations yet.</div>';
+    window._models = models;
+    ge('modelStatus').textContent = models.length + ' generated model(s) found.';
+    if(initialOutDir){
+      var match = models.filter(function(item){ return item.out_dir === initialOutDir; })[0];
+      if(match) selectModel(match.id);
+      initialOutDir = '';
+    }
+  });
+}
+function selectModel(id){
+  selected = (window._models || []).filter(function(x){ return x.id === id; })[0];
+  document.querySelectorAll('.model-item').forEach(function(el){ el.classList.remove('active'); });
+  var btn = ge('m'+id); if(btn) btn.classList.add('active');
+  var modelUrl = withToken(location.origin + selected.final_glb);
+  ge('viewerFrame').src = '/HTML/Viewer3d.html?model=' + encodeURIComponent(modelUrl) + '&name=model.glb';
+  ge('emptyPreview').style.display = 'none';
+  var ready = !!(selected.print_ready || selected.print_watertight || selected.watertight);
+  ge('checkWatertight').textContent = ready ? 'yes' : 'no';
+  ge('checkWatertight').className = ready ? 'ok' : 'bad';
+  ge('checkStl').textContent = selected.stl_path ? 'ready' : 'will use export';
+  ge('checkStl').className = selected.stl_path ? 'ok' : 'warn';
+  ge('prepareBtn').disabled = !ge('printerSelect').value;
+  ge('jobStatus').textContent = 'Model selected: ' + (selected.label || selected.out_dir);
+}
+function loadPrinters(){
+  jget('/printers', function(d){
+    var printers = d.printers || [];
+    ge('printerSelect').innerHTML = printers.map(function(p){
+      return '<option value="' + esc(p.id) + '">' + esc(p.id) + ' (' + esc(p.type) + ', ' + esc(p.status || 'unknown') + ')</option>';
+    }).join('');
+    if(!printers.length) ge('printerSelect').innerHTML = '<option value="">No configured printers</option>';
+    ge('prepareBtn').disabled = !(selected && ge('printerSelect').value);
+    ge('jobStatus').textContent = printers.length ? 'Printer list loaded.' : 'Configure TRIGENIX_PRINTERS first.';
+  });
+}
+['scaleX','scaleY','scaleZ'].forEach(function(id){
+  ge(id).addEventListener('input', function(){
+    if(!ge('linkedScale').checked) return;
+    var v = this.value;
+    ['scaleX','scaleY','scaleZ'].forEach(function(other){ if(other !== id) ge(other).value = v; });
+  });
+});
+function preparePrint(){
+  if(!selected) return;
+  var body = {
+    out_dir: selected.out_dir,
+    printer_id: ge('printerSelect').value,
+    scale_mm: {x:+ge('scaleX').value, y:+ge('scaleY').value, z:+ge('scaleZ').value},
+    settings: {layer_height:+ge('layerHeight').value, infill:+ge('infill').value, supports:ge('supports').checked, material:ge('material').value}
+  };
+  ge('jobStatus').textContent = 'Preparing and slicing...';
+  jpost('/print/prepare', body, function(d){
+    if(!d.ok){ ge('jobStatus').textContent = 'Prepare failed: ' + (d.error || 'unknown'); return; }
+    preparedToken = d.job_token;
+    ge('startBtn').disabled = false;
+    ge('checkPrint').textContent = 'prepared';
+    ge('checkPrint').className = 'ok';
+    ge('jobStatus').textContent = 'Prepared. Review the printer and settings, then start explicitly.';
+  });
+}
+function startPrint(){
+  if(!preparedToken || !confirm('Start this physical print job now?')) return;
+  jpost('/print/start', {job_token: preparedToken}, function(d){
+    if(!d.ok){ ge('jobStatus').textContent = 'Start failed: ' + (d.error || 'unknown'); return; }
+    ge('cancelBtn').disabled = false;
+    ge('checkPrint').textContent = d.status || 'started';
+    ge('jobStatus').textContent = 'Print started. Job id: ' + (d.job_id || preparedToken);
+    pollStatus(d.job_id || preparedToken);
+  });
+}
+function pollStatus(jobId){
+  clearInterval(statusTimer);
+  statusTimer = setInterval(function(){
+    jget('/print/status?job_id=' + encodeURIComponent(jobId), function(d){
+      if(d.ok) ge('jobStatus').textContent = JSON.stringify(d.status, null, 2);
+    });
+  }, 5000);
+}
+function cancelPrint(){
+  if(!preparedToken) return;
+  jpost('/print/cancel', {job_id: preparedToken}, function(d){
+    clearInterval(statusTimer);
+    ge('checkPrint').textContent = d.ok ? 'cancelled' : 'cancel failed';
+    ge('checkPrint').className = d.ok ? 'warn' : 'bad';
+    ge('jobStatus').textContent = d.ok ? 'Cancellation sent.' : (d.error || 'Cancel failed');
+  });
+}
+loadHistory();
+loadPrinters();
+
+function toggleTool(id) {
+  var el = ge(id);
+  if (el) el.classList.toggle('open');
+}
+
+function doHollow() {
+  if (!selected) return;
+  var wall  = parseFloat(ge('hollowWall').value)  || 3.0;
+  var drain = parseFloat(ge('hollowDrain').value) || 4.0;
+  var st = ge('hollow-status');
+  st.style.display = ''; st.textContent = 'Hollowing...';
+  jpost('/mesh/hollow', {out_dir: selected.out_dir, wall_mm: wall, drain_diameter_mm: drain}, function(d) {
+    if (d.ok) {
+      st.textContent = 'Done! Download: ' + (d.stl_url || '');
+      if (d.stl_url) {
+        var a = document.createElement('a');
+        a.href = d.stl_url + '?token=' + token;
+        a.download = 'model_hollow.stl';
+        a.click();
+      }
+    } else {
+      st.textContent = 'Error: ' + (d.error || 'Hollow failed');
+    }
+  });
+}
+
+function doSplit() {
+  if (!selected) return;
+  var bw   = parseFloat(ge('splitW').value) || 220;
+  var bd   = parseFloat(ge('splitD').value) || 220;
+  var conn = ge('splitConn').value;
+  var st = ge('split-status');
+  st.style.display = ''; st.textContent = 'Splitting...';
+  jpost('/mesh/split', {out_dir: selected.out_dir, bed_width_mm: bw, bed_depth_mm: bd, connector_type: conn}, function(d) {
+    if (d.ok) {
+      st.textContent = 'Split into ' + d.part_count + ' parts. Downloads started.';
+      (d.parts || []).forEach(function(url) {
+        var a = document.createElement('a'); a.href = url + '?token=' + token;
+        a.download = url.split('/').pop(); a.click();
+      });
+    } else {
+      st.textContent = 'Error: ' + (d.error || 'Split failed');
+    }
+  });
+}
+
+function doMulticolor() {
+  if (!selected) return;
+  var fmt = ge('mcFormat').value;
+  var st = ge('mc-status');
+  st.style.display = ''; st.textContent = 'Exporting...';
+  jpost('/mesh/multicolor', {out_dir: selected.out_dir, format: fmt}, function(d) {
+    if (d.ok) {
+      st.textContent = 'Exported ' + (d.files || []).length + ' file(s). Downloads started.';
+      (d.files || []).forEach(function(url) {
+        var a = document.createElement('a'); a.href = url + '?token=' + token;
+        a.download = url.split('/').pop(); a.click();
+      });
+    } else {
+      st.textContent = 'Error: ' + (d.error || 'Export failed');
+    }
+  });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,43 @@
+﻿# TriGenix — Python dependencies
+# Install with: pip install -r requirements.txt
+# Requires Python 3.11+ and CUDA 11.8+ for GPU inference
+
+# Core ML
+torch>=2.1.0
+diffusers>=0.24.0
+transformers>=4.36.0
+accelerate>=0.25.0
+
+# 3D processing
+trimesh>=4.0.0
+pymeshfix>=0.16.0
+scikit-image>=0.21.0
+scipy>=1.11.0
+numpy>=1.24.0
+open3d>=0.17.0
+
+# Image processing
+Pillow>=10.0.0
+opencv-python>=4.8.0
+rembg>=2.0.50
+
+# ML utilities
+scikit-learn>=1.3.0
+
+# Web
+Flask>=3.0.0
+
+# Data
+pandas>=2.0.0
+
+# Utilities
+joblib>=1.3.0
+tqdm>=4.65.0
+
+# Optional: for hollowing / boolean ops
+# trimesh[easy]>=4.0.0  # includes manifold3d for booleans
+
+# Dev / test
+pytest>=7.4.0
+pytest-timeout>=2.1.0
+hypothesis>=6.82.0
