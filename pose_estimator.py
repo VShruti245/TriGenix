@@ -144,14 +144,35 @@ def estimate_pose(image_path: str, out_dir: str = None) -> PoseResult:
     result.cond_elevation = float(np.clip(-result.elevation, -30, 30))
 
     # ── World rotation — IDENTITY when near-frontal ───────────────────────────
-    if abs(result.roll) < 5.0 and abs(result.azimuth) < 5.0:
+    # Compose Rx (elevation) @ Ry (azimuth) @ Rz (roll).
+    # Elevation tilts the mesh up/down so it faces the camera correctly.
+    # Small angles (< 5°) are ignored per-axis to avoid jitter on symmetric
+    # or nearly-frontal objects.
+    _az_big  = abs(result.azimuth)   > 5.0
+    _el_big  = abs(result.elevation) > 5.0
+    _roll_big= abs(result.roll)      > 5.0
+
+    if not _az_big and not _el_big and not _roll_big:
         result.world_R = np.eye(3, dtype=np.float32)
     else:
-        rz = np.radians(-result.roll)
-        Rz = np.array([[np.cos(rz),-np.sin(rz),0],[np.sin(rz),np.cos(rz),0],[0,0,1]],np.float32)
-        ry = np.radians(-result.azimuth)
-        Ry = np.array([[np.cos(ry),0,np.sin(ry)],[0,1,0],[-np.sin(ry),0,np.cos(ry)]],np.float32)
-        result.world_R = Ry @ Rz
+        rz = np.radians(-result.roll)      if _roll_big else 0.0
+        ry = np.radians(-result.azimuth)   if _az_big   else 0.0
+        rx = np.radians(-result.elevation) if _el_big   else 0.0
+
+        Rz = np.array([[np.cos(rz),-np.sin(rz),0],
+                        [np.sin(rz), np.cos(rz),0],
+                        [0,          0,          1]], np.float32)
+        Ry = np.array([[ np.cos(ry),0,np.sin(ry)],
+                        [ 0,         1,0          ],
+                        [-np.sin(ry),0,np.cos(ry)]], np.float32)
+        # Rx rotates around X: positive elevation means camera looks DOWN at
+        # the object, so the mesh should tilt TOWARD the camera (rotate -el
+        # around X so the top of the object faces the camera).
+        Rx = np.array([[1, 0,          0         ],
+                        [0, np.cos(rx),-np.sin(rx)],
+                        [0, np.sin(rx), np.cos(rx)]], np.float32)
+        # Order: roll first (in-plane), then azimuth, then elevation
+        result.world_R = Rx @ Ry @ Rz
 
     result.debug = {
         "pca_angle": round(angle_deg,2), "aspect": round(aspect,3),

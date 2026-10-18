@@ -582,10 +582,16 @@ function _startReconPoll(outDir) {
         if (d.method === 'triposr') _logEvent('Tip: install nvdiffrast (pip install nvdiffrast) to enable InstantMesh for better multi-view geometry.');
         _logEvent('.glb file ready: ' + (d.final_glb || ''));
         if (d.recon_time) _saveAvgTimes({ reconstruction: parseFloat(d.recon_time) });
+        // Save processor stage times if returned alongside recon result
+        if (d.stage_times) _saveAvgTimes(d.stage_times);
         _updateReconCard('done', d);
         _finishProgress('.glb ready!');
         _updateCompareViewer(d.final_glb);
       } else if (d.status === 'running' || d.status === 'queued') {
+        // Update ETA using real elapsed_seconds from server
+        if (typeof d.elapsed_seconds === 'number') {
+          _updateETAFromServer(d.elapsed_seconds);
+        }
         var qpos = d.queue_position || 0;
         if (qpos > 1) {
           _logEvent('GPU queue position: ' + qpos);
@@ -875,10 +881,18 @@ function _showErr(msg, detail) {
 
 /* ══════════════════════════════════════════════════════════════
    ESTIMATED TIME REMAINING
-   Stores past stage times in localStorage to predict future runs
+   Uses real elapsed_seconds from server + historical stage averages
+   from localStorage to show accurate live countdown.
 ══════════════════════════════════════════════════════════════ */
 var _genStartTime  = null;
 var _etaInterval   = null;
+// Default stage estimates (seconds) — updated from localStorage after each run
+var STAGE_DEFAULTS = {
+  bg_removal:       8,
+  view_synthesis:   900,   // ~15 min on RTX 3050
+  depth_estimation: 60,
+  reconstruction:   300,   // ~5 min TripoSR
+};
 
 var STAGE_LABELS = [
   { key: 'bg_removal',       label: 'Background removal' },
@@ -897,7 +911,9 @@ function _saveAvgTimes(stageTimes) {
   try {
     var avg = _getAvgTimes();
     Object.keys(stageTimes).forEach(function(k) {
-      avg[k] = avg[k] ? Math.round((avg[k] * 0.6 + stageTimes[k] * 0.4)) : stageTimes[k];
+      var v = parseFloat(stageTimes[k]);
+      if (!isFinite(v) || v <= 0) return;
+      avg[k] = avg[k] ? Math.round(avg[k] * 0.6 + v * 0.4) : Math.round(v);
     });
     localStorage.setItem('tg_avg_times', JSON.stringify(avg));
   } catch(e) {}
@@ -907,28 +923,44 @@ function _getTotalEstimate() {
   var avg = _getAvgTimes();
   var keys = ['bg_removal','view_synthesis','depth_estimation','reconstruction'];
   var total = 0;
-  keys.forEach(function(k) { total += (avg[k] || 0); });
-  return total;  // seconds, 0 = no data yet
+  keys.forEach(function(k) {
+    total += avg[k] || STAGE_DEFAULTS[k] || 0;
+  });
+  return total;  // seconds
+}
+
+function _fmtRemaining(secs) {
+  secs = Math.max(0, Math.round(secs));
+  if (secs < 60) return '~' + secs + 's remaining';
+  var m = Math.floor(secs / 60), s = secs % 60;
+  return '~' + m + 'm ' + (s < 10 ? '0' : '') + s + 's remaining';
+}
+
+function _updateETADisplay(remainingSecs) {
+  var etaEl = ge('eta-display');
+  if (!etaEl) return;
+  if (remainingSecs <= 0) { etaEl.textContent = 'almost done…'; return; }
+  etaEl.textContent = _fmtRemaining(remainingSecs);
+}
+
+// Called every poll tick with real elapsed_seconds from server
+function _updateETAFromServer(elapsedSecs) {
+  var total = _getTotalEstimate();
+  if (!total) return;
+  var remaining = total - elapsedSecs;
+  _updateETADisplay(remaining);
 }
 
 function _startETA() {
   _genStartTime = Date.now();
   var total = _getTotalEstimate();
-  if (!total) return; // no history yet
-  ge('progressLabel').textContent = 'Starting…';
+  // Show estimate immediately (client-side elapsed before first poll)
   _etaInterval = setInterval(function() {
-    var elapsed  = (Date.now() - _genStartTime) / 1000;
-    var remaining = Math.max(0, total - elapsed);
-    var mins = Math.floor(remaining / 60);
-    var secs = Math.round(remaining % 60);
-    var etaStr = mins > 0 ? '~' + mins + 'm ' + secs + 's remaining' : '~' + secs + 's remaining';
-    var label = ge('progressLabel');
-    if (label && !label.textContent.includes('…') === false) {
-      // append ETA to existing label
-    }
-    var etaEl = ge('eta-display');
-    if (etaEl) etaEl.textContent = etaStr;
+    var clientElapsed = (Date.now() - _genStartTime) / 1000;
+    var remaining = total - clientElapsed;
+    _updateETADisplay(remaining);
   }, 1000);
+  _updateETADisplay(total);
 }
 
 function _stopETA() {

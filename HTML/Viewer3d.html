@@ -500,8 +500,8 @@ function initApp(){
   gMats.forEach(function(m){m.opacity=0.5;m.transparent=true;});
   scene.add(gridHelper);
 
-  shadowPlane=new THREE.Mesh(new THREE.PlaneGeometry(40,40),new THREE.ShadowMaterial({opacity:.16}));
-  shadowPlane.rotation.x=-Math.PI/2;shadowPlane.position.y=-0.001;shadowPlane.receiveShadow=true;
+  shadowPlane=new THREE.Mesh(new THREE.PlaneGeometry(40,40),new THREE.ShadowMaterial({opacity:.08,depthWrite:false}));
+  shadowPlane.rotation.x=-Math.PI/2;shadowPlane.position.y=-0.001;shadowPlane.receiveShadow=true;shadowPlane.renderOrder=0;
   scene.add(shadowPlane);
 
   new ResizeObserver(function(){
@@ -631,29 +631,31 @@ function finishLoad(model,name,fmt){
   _basePos.set(-ct2.x,-box2.min.y,-ct2.z);  // store floor-aligned base for slider offsets
   model.traverse(function(c){
     if(!c.isMesh)return;
-    c.castShadow=true;c.receiveShadow=true;
+    c.castShadow=true;c.receiveShadow=false;
     var hasVC=!!(c.geometry&&c.geometry.attributes.color);
     var mats=Array.isArray(c.material)?c.material:[c.material];
     var hasMap=mats.some(function(mt){return !!(mt&&mt.map);});
     if(hasVC){
       // MeshBasicMaterial for vertex colors: shows stored colors at face value.
-      // MeshStandardMaterial darkens vertex colors via ACES tone mapping.
-      // Vertex colors are already the correct sRGB values from the photo/atlas.
+      // Use FrontSide only — DoubleSide renders inside faces through the grid
+      // when the model is rotated, causing vertex colors to bleed onto the floor.
       c.material=new THREE.MeshBasicMaterial({
         vertexColors:true,
-        side:THREE.DoubleSide
+        side:THREE.FrontSide,
+        depthWrite:true,
+        depthTest:true
       });
     } else if(hasMap){
-      // UV texture map (from TripoSR atlas): use MeshStandardMaterial with
-      // proper lighting so texture detail is visible.
       mats.forEach(function(mt){
-        mt.side=THREE.DoubleSide;
+        mt.side=THREE.FrontSide;
+        mt.depthWrite=true;
+        mt.depthTest=true;
         mt.roughness=0.7;
         mt.metalness=0.0;
         mt.needsUpdate=true;
       });
     } else {
-      c.material=new THREE.MeshStandardMaterial({color:0xcccccc,roughness:0.6,metalness:0,side:THREE.DoubleSide});
+      c.material=new THREE.MeshStandardMaterial({color:0xcccccc,roughness:0.6,metalness:0,side:THREE.FrontSide,depthWrite:true});
     }
     c.material.needsUpdate=true;
   });
@@ -728,7 +730,7 @@ function applyShading(){
     if(mode==='wireframe'){
       c.material=new THREE.MeshBasicMaterial({color:0xffffff,wireframe:true});
     } else if(mode==='normals'){
-      c.material=new THREE.MeshNormalMaterial({side:THREE.DoubleSide});
+      c.material=new THREE.MeshNormalMaterial({side:THREE.FrontSide});
     } else if(mode==='matcap'){
       c.material=new THREE.MeshMatCapMaterial({color:0xdddddd});
     } else {
@@ -737,12 +739,12 @@ function applyShading(){
       var hasMap=mats.some(function(mt){return !!(mt&&mt.map);});
       var o=+ge('sl-opac').value;
       if(hasVC){
-        c.material=new THREE.MeshBasicMaterial({vertexColors:true,opacity:o,transparent:o<1,side:THREE.DoubleSide});
+        c.material=new THREE.MeshBasicMaterial({vertexColors:true,opacity:o,transparent:o<1,side:THREE.FrontSide,depthWrite:true,depthTest:true});
       } else if(hasMap){
-        mats.forEach(function(mt){mt.opacity=o;mt.transparent=o<1;mt.side=THREE.DoubleSide;mt.needsUpdate=true;});
+        mats.forEach(function(mt){mt.opacity=o;mt.transparent=o<1;mt.side=THREE.FrontSide;mt.depthWrite=true;mt.needsUpdate=true;});
       } else {
         var m=+ge('sl-metal').value,r=+ge('sl-rough').value;
-        c.material=new THREE.MeshStandardMaterial({color:new THREE.Color(ge('col-base').value),metalness:m,roughness:r,opacity:o,transparent:o<1,side:THREE.DoubleSide});
+        c.material=new THREE.MeshStandardMaterial({color:new THREE.Color(ge('col-base').value),metalness:m,roughness:r,opacity:o,transparent:o<1,side:THREE.FrontSide,depthWrite:true});
       }
     }
     c.material.needsUpdate=true;
@@ -805,7 +807,7 @@ function applyScene(){
   gridHelper.visible=ge('tog-grid').checked;
   renderer.shadowMap.enabled=ge('tog-shadow').checked;
   if(currentModel)currentModel.traverse(function(c){
-    if(c.isMesh){c.castShadow=renderer.shadowMap.enabled;c.receiveShadow=renderer.shadowMap.enabled;}
+    if(c.isMesh){c.castShadow=renderer.shadowMap.enabled;c.receiveShadow=false;}
   });
 }
 function applyLighting(){
@@ -947,13 +949,13 @@ function toggleDefects() {
         colors[i*3+2] = conf * 0.5;
       }
       c.geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-      c.material = new THREE.MeshBasicMaterial({vertexColors: true, side: THREE.DoubleSide});
+      c.material = new THREE.MeshBasicMaterial({vertexColors: true, side: THREE.FrontSide, depthWrite:true, depthTest:true});
     } else {
       if (_originalColors && c.geometry.attributes.color) {
         c.geometry.attributes.color.array.set(_originalColors);
         c.geometry.attributes.color.needsUpdate = true;
       }
-      c.material = new THREE.MeshBasicMaterial({vertexColors: true, side: THREE.DoubleSide});
+      c.material = new THREE.MeshBasicMaterial({vertexColors: true, side: THREE.FrontSide, depthWrite:true, depthTest:true});
     }
     c.material.needsUpdate = true;
   });

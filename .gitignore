@@ -1,0 +1,68 @@
+# ── Generated outputs ──────────────────────────────────────────
+generated/
+uploads/
+output/
+
+# ── Model weights ───────────────────────────────────────────────
+weights/
+*.ckpt
+*.pt
+*.pth
+*.bin
+
+# ── Database & secrets ─────────────────────────────────────────
+*.db
+.env
+.env.*
+!.env.example
+
+# ── Python cache ───────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# ── Kiro IDE ───────────────────────────────────────────────────
+.kiro/
+.codex_build/
+.codex-finalizer/
+
+# ── Large model repos (cloned) ─────────────────────────────────
+InstantMesh/
+TripoSR/
+
+# ── Presentations & posters ────────────────────────────────────
+*.pptx
+*.docx
+*.pdf
+poster_assets/
+
+# ── Videos & archives ──────────────────────────────────────────
+*.mp4
+*.zip
+*.mov
+
+# ── Scratch & temp files ───────────────────────────────────────
+build_*.py
+make_*.py
+revise_*.py
+update_*.py
+create_*.py
+extract_*.py
+inspect_*.py
+verify_*.py
+directory.txt
+test_temp.db
+docs/
+paper/
+plagiarism*/
+"Plagiarism*"
+
+# ── Misc ───────────────────────────────────────────────────────
+.gitattributes
+terminal_op.mp4
+working*
+tests/__pycache__/

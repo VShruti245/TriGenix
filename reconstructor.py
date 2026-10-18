@@ -1070,168 +1070,246 @@ def paint_colors(mesh, views, base_colors=None, triposr_glb_path=None):
     mesh.visual = _tm.visual.ColorVisuals(mesh=mesh)
 
     # ── Step 1: Segment front photo into color regions ─────────────────────
-    seg_regions = None   # list of {'color': [R,G,B], 'label_map': H×W array}
-    seg_label_img = None # H×W int array, value=region index, -1=background
-    # SEGMENTATION uses the INPUT PHOTO (view0) -- it has clean alpha from
-    # rembg, giving accurate foreground pixels for color clustering.
-    # PROJECTION uses GENERATED VIEWS (view1+) -- calibrated known poses.
-    # This separates the two concerns: color region detection vs spatial mapping.
-    _SEG_VIEW_IDX = 1 if len(views) > 1 else 0   # primary projection view
-    _FRONT_VIEW   = views[0] if views else None   # input photo for segmentation
+    seg_regions = None   # list of {'color': [R,G,B], 'pct': float}
+    seg_label_img = None # H×W int array, value=superpixel index, -1=background
 
-    if _HAS_SKLEARN and _FRONT_VIEW is not None:
+    # ── SLIC superpixel segmentation ───────────────────────────────────────
+    # Strategy: SLIC generates 200-500 small spatially-coherent patches.
+    # Each patch is a connected region of similar color AND similar spatial
+    # location — so car tire, car body, car window are always separate patches
+    # even if they share similar brightness.
+    #
+    # Then we merge adjacent SLIC patches that have very similar color
+    # (ΔE < threshold) into "semantic regions". This gives us:
+    #   - Fine-grained spatial boundaries (from SLIC)
+    #   - Clean per-region colors (from merge + trimmed mean)
+    #
+    # Each vertex projects → pixel → SLIC patch → merged region → color.
+    # No cross-region blending — tire pixels only get tire color.
+    #
+    # SEGMENTATION uses the INPUT PHOTO (view0) — clean alpha from rembg.
+    # PROJECTION uses GENERATED VIEWS (view1+) — known calibrated poses.
+
+    _SEG_VIEW_IDX = 1 if len(views) > 1 else 0
+    _FRONT_VIEW   = views[0] if views else None
+
+    if _FRONT_VIEW is not None:
         try:
+            from skimage.segmentation import slic as _slic
+            from skimage.color import rgb2lab as _rgb2lab
+            from scipy.ndimage import label as _ndlabel
+
+            _fraw  = (_FRONT_VIEW.get("rgb_raw") or _FRONT_VIEW["rgb"]).convert("RGBA")
+            _frgba = np.array(_fraw.resize((S, S), Image.LANCZOS))
+            _fg    = _frgba[..., 3] >= FG_ALPHA_THRESHOLD          # H×W bool
+            _frgb  = _frgba[..., :3].astype(np.uint8)              # H×W×3
+
+            # ── Step 1a: SLIC superpixels ─────────────────────────────────
+            # n_segments scales with foreground area so small objects get
+            # fewer, more reliable patches.
+            _fg_px   = int(_fg.sum())
+            _n_seg   = int(np.clip(_fg_px ** 0.55, 80, 600))
+            # compactness: low = color-dominant boundaries (better for objects
+            # with sharp color transitions like car tire/body).
+            _sp_map  = _slic(
+                _frgb,
+                n_segments=_n_seg,
+                compactness=8,
+                sigma=1.0,
+                start_label=0,
+                mask=_fg.astype(np.uint8),
+                channel_axis=2,
+            )                                                        # H×W int
+            _n_sp    = int(_sp_map.max()) + 1
+            logger.info("  SLIC: %d superpixels requested → %d produced (fg=%d px)",
+                        _n_seg, _n_sp, _fg_px)
+
+            # ── Step 1b: Compute per-superpixel mean color (Lab) ──────────
+            _flab    = _rgb2lab(_frgb.astype(np.float32) / 255.0)   # H×W×3 Lab
+            _sp_lab  = np.zeros((_n_sp, 3), dtype=np.float32)
+            _sp_rgb  = np.zeros((_n_sp, 3), dtype=np.float32)
+            _sp_cnt  = np.zeros(_n_sp, dtype=np.int32)
+            _sp_flat = _sp_map.ravel()
+            _fg_flat = _fg.ravel()
+            _lab_flat= _flab.reshape(-1, 3)
+            _rgb_flat= _frgb.reshape(-1, 3).astype(np.float32)
+
+            np.add.at(_sp_lab, _sp_flat, _lab_flat * _fg_flat[:, None])
+            np.add.at(_sp_rgb, _sp_flat, _rgb_flat * _fg_flat[:, None])
+            np.add.at(_sp_cnt, _sp_flat, _fg_flat.astype(np.int32))
+
+            _valid_sp = _sp_cnt > 0
+            _sp_lab[_valid_sp] /= _sp_cnt[_valid_sp, None]
+            _sp_rgb[_valid_sp] /= _sp_cnt[_valid_sp, None]
+
+            # ── Step 1c: Merge adjacent similar superpixels ────────────────
+            # Two superpixels merge if their Lab ΔE < merge_thresh AND they
+            # are spatially adjacent (share at least one border pixel).
+            # This collapses the 300+ SLIC patches into ~15-60 semantic
+            # regions while keeping sharp color-edge boundaries intact.
+            #
+            # merge_thresh controls granularity:
+            #   low  (8)  → more regions, finer detail  (tire vs hubcap)
+            #   high (20) → fewer regions, cleaner blobs (whole tire = one region)
+            # We use 12 — a balance that preserves major boundaries (roof vs
+            # wall vs window vs door) while merging nearly-identical patches.
+            _merge_thresh = 12.0
+
+            # Build adjacency: find superpixel pairs that share a border pixel
+            _adj = set()
+            _rows, _cols = _sp_map.shape
+            # Horizontal adjacency
+            _ah = np.stack([_sp_map[:, :-1].ravel(), _sp_map[:, 1:].ravel()], axis=1)
+            _ah = _ah[_ah[:, 0] != _ah[:, 1]]
+            for _p, _q in _ah:
+                _adj.add((min(int(_p), int(_q)), max(int(_p), int(_q))))
+            # Vertical adjacency
+            _av = np.stack([_sp_map[:-1, :].ravel(), _sp_map[1:, :].ravel()], axis=1)
+            _av = _av[_av[:, 0] != _av[:, 1]]
+            for _p, _q in _av:
+                _adj.add((min(int(_p), int(_q)), max(int(_p), int(_q))))
+
+            # Union-Find for merging
+            _parent = np.arange(_n_sp, dtype=np.int32)
+
+            def _find(x):
+                while _parent[x] != x:
+                    _parent[x] = _parent[_parent[x]]
+                    x = _parent[x]
+                return x
+
+            def _union(x, y):
+                rx, ry = _find(x), _find(y)
+                if rx != ry:
+                    _parent[ry] = rx
+
+            # Iterative merge: keep merging until stable
+            _changed = True
+            _iters   = 0
+            while _changed and _iters < 8:
+                _changed = False
+                _iters  += 1
+                for (_p, _q) in list(_adj):
+                    rp, rq = _find(_p), _find(_q)
+                    if rp == rq:
+                        continue
+                    if not (_valid_sp[_p] and _valid_sp[_q]):
+                        continue
+                    # ΔE between superpixel means (use root's accumulated mean)
+                    _dE = float(np.linalg.norm(_sp_lab[rp] - _sp_lab[rq]))
+                    if _dE < _merge_thresh:
+                        # Weighted merge: update root's Lab/RGB mean
+                        _cp  = _sp_cnt[rp]
+                        _cq  = _sp_cnt[rq]
+                        _tot = _cp + _cq
+                        if _tot > 0:
+                            _sp_lab[rp] = (_sp_lab[rp]*_cp + _sp_lab[rq]*_cq) / _tot
+                            _sp_rgb[rp] = (_sp_rgb[rp]*_cp + _sp_rgb[rq]*_cq) / _tot
+                            _sp_cnt[rp] = _tot
+                        _union(_p, _q)
+                        _changed = True
+
+            # Build final label map: each pixel → merged region root id
+            # Remap root ids to contiguous 0..n_regions-1
+            _roots     = np.array([_find(i) for i in range(_n_sp)], dtype=np.int32)
+            _uniq_roots= np.unique(_roots)
+            _root2reg  = {r: i for i, r in enumerate(_uniq_roots)}
+            _n_regions = len(_uniq_roots)
+
+            # pixel label map: -1 for background
+            _region_map = np.full(S * S, -1, dtype=np.int32)
+            _fg_idx     = np.where(_fg_flat)[0]
+            for _idx in _fg_idx:
+                _sp_id  = _sp_flat[_idx]
+                _root   = _roots[_sp_id]
+                _region_map[_idx] = _root2reg[_root]
+
+            seg_label_img = _region_map                             # flat S*S
+            _lbl_img      = _region_map.reshape(S, S)
+
+            # ── Step 1d: Per-region trimmed-mean color ─────────────────────
+            seg_regions = []
+            _rgb_flat_fg = _rgb_flat[_fg_flat]
+            _reg_flat_fg = _region_map[_fg_flat]
+
+            for _ri, _root in enumerate(_uniq_roots):
+                _mask    = _reg_flat_fg == _ri
+                _cnt_r   = int(_mask.sum())
+                _pct     = float(_cnt_r / max(1, _fg_px) * 100)
+                if _cnt_r < 15 or _pct < 0.3:
+                    seg_regions.append(None)
+                    continue
+                _pix     = _rgb_flat_fg[_mask]
+                # Trimmed mean: drop darkest 10% and brightest 10%
+                _bri     = _pix.mean(axis=1)
+                _lo, _hi = np.percentile(_bri, [10, 90])
+                _ok      = (_bri >= _lo) & (_bri <= _hi)
+                if _ok.sum() < 5:
+                    _ok  = np.ones(len(_pix), dtype=bool)
+                _col     = _pix[_ok].mean(axis=0)
+                seg_regions.append({"color": _col, "pct": _pct})
+
+            _nreg = sum(1 for r in seg_regions if r is not None)
+            logger.info(
+                "  SLIC segmentation: %d superpixels → %d merged regions "
+                "(merge_thresh=%.1f ΔE)",
+                _n_sp, _nreg, _merge_thresh,
+            )
+            for _ri, _r in enumerate(seg_regions):
+                if _r is None:
+                    continue
+                _c   = _r["color"].astype(int)
+                logger.info("    region %d: %.1f%%  RGB=[%d,%d,%d]",
+                            _ri, _r["pct"], _c[0], _c[1], _c[2])
+
+        except Exception as _se:
+            logger.warning("  SLIC segmentation failed (%s) — falling back to k-means", _se)
+            seg_regions    = None
+            seg_label_img  = None
+
+    # ── k-means fallback (used when skimage not available or SLIC fails) ───
+    if seg_label_img is None and _HAS_SKLEARN and _FRONT_VIEW is not None:
+        try:
+            from sklearn.cluster import MiniBatchKMeans as _KMeans
             _fraw  = (_FRONT_VIEW.get("rgb_raw") or _FRONT_VIEW["rgb"]).convert("RGBA")
             _frgba = np.array(_fraw.resize((S, S), Image.LANCZOS))
             _fg    = _frgba[..., 3] >= FG_ALPHA_THRESHOLD
             _frgb  = _frgba[..., :3].astype(np.float32)
-
-            # HSV for hue-based clustering
             _fhsv  = np.array(
-                Image.fromarray(_frgba[..., :3]).resize((S, S)).convert("HSV"),
-                dtype=np.float32
+                Image.fromarray(_frgba[..., :3]).convert("HSV"), dtype=np.float32
             )
             _h_rad = _fhsv[..., 0] / 255.0 * 2.0 * np.pi
-            # Spatial weight removed: cluster on color only (hue, sat, value).
-            # Spatial weight caused single-color regions (knife blade, dino body)
-            # to be split by position, assigning wrong colors to wrong vertices.
-            _feat_all = np.stack([
-                np.sin(_h_rad),
-                np.cos(_h_rad),
-                _fhsv[..., 1] / 255.0 * 2.0,   # saturation weighted 2x
-                _fhsv[..., 2] / 255.0,
-            ], axis=-1).reshape(-1, 4)
-
+            _feat  = np.stack([
+                np.sin(_h_rad).ravel(),
+                np.cos(_h_rad).ravel(),
+                (_fhsv[..., 1] / 255.0 * 2.0).ravel(),
+                (_fhsv[..., 2] / 255.0).ravel(),
+            ], axis=1)
             _fg_flat = _fg.ravel()
-            _feat_fg = _feat_all[_fg_flat]
-            _rgb_fg  = _frgb.reshape(-1, 3)[_fg_flat]
-
-            # Auto k: 4 for simple objects, 8 for complex
-            # Auto k: 4 for simple mono-color objects, 10 for complex multi-color.
-            # House needs k>=6 for roof/walls/trim/door/plants/flowers.
-            _k = min(10, max(4, int(_fg_flat.sum() ** 0.25)))
+            _k   = min(10, max(4, int(_fg_flat.sum() ** 0.25)))
             _km  = _KMeans(n_clusters=_k, random_state=42, n_init=3)
-            _lbl = _km.fit_predict(_feat_fg)
-
-            # Build full-image label map (-1 = background)
+            _lbl = _km.fit_predict(_feat[_fg_flat])
             seg_label_img = np.full(S * S, -1, dtype=np.int32)
             seg_label_img[_fg_flat] = _lbl
-            _lbl_img = seg_label_img.reshape(S, S)
-
-            # Spatial coherence filter: remove isolated cluster pixels.
-            # A pixel whose 7x7 neighborhood is dominated by a DIFFERENT
-            # cluster gets reassigned to background (-1).
-            # This removes scattered leaf pixels on the body.
-            try:
-                from scipy.ndimage import label, uniform_filter
-                _background_before = int((_lbl_img == -1).sum())
-                _clean = _lbl_img.copy()
-                for _ci2 in range(_k):
-                    _region_mask = (_lbl_img == _ci2).astype(np.float32)
-                    # fraction of 7x7 window that is this region
-                    _local_frac = uniform_filter(_region_mask, size=7)
-                    # pixels where <25% of local neighborhood is same region
-                    _isolated = (_lbl_img == _ci2) & (_local_frac < 0.25)
-                    _clean[_isolated] = -1
-
-                # Drop disconnected islands inside each color cluster. This is
-                # the part that prevents a leaf-colored cluster from sprinkling
-                # isolated body pixels across the mesh.
-                _min_component = max(
-                    64,
-                    int(COLOR_REGION_MIN_COMPONENT_PCT * max(1, int(_fg.sum()))),
-                )
-                for _ci2 in range(_k):
-                    _cc, _count = label(_clean == _ci2)
-                    if _count <= 1:
-                        continue
-                    _counts = np.bincount(_cc.ravel())
-                    _small = _counts < _min_component
-                    _small[0] = False
-                    _clean[_small[_cc]] = -1
-
-                _removed = int((_clean == -1).sum()) - _background_before
-                seg_label_img = _clean.ravel()
-                _lbl_img = _clean
-                logger.info("  Spatial filter: removed %d isolated pixels", _removed)
-            except Exception as _spf_e:
-                logger.warning('  Spatial filter failed: %s', _spf_e)
-
-            # Compute region dominant colors
+            _rgb_fg = _frgb.reshape(-1, 3)[_fg_flat]
             seg_regions = []
             for _cl in range(_k):
-                _mask = (seg_label_img.ravel()[_fg_flat] == _cl) if True else (_lbl == _cl)
-                # Re-derive mask from cleaned label image
-                _mask = np.zeros(len(_rgb_fg), dtype=bool)
-                _all_pos = np.where(_fg_flat)[0]
-                for _pidx, _pos in enumerate(_all_pos):
-                    if seg_label_img[_pos] == _cl:
-                        _mask[_pidx] = True
+                _mask = _lbl == _cl
                 if _mask.sum() < 20:
-                    seg_regions.append(None)
-                    continue
-                _pct = float(_mask.mean() * 100)
-                # Skip tiny regions (<1.5% of foreground) -- noise/highlights
+                    seg_regions.append(None); continue
+                _pct  = float(_mask.mean() * 100)
                 if _pct < 1.5:
-                    seg_regions.append(None)
-                    continue
-                # Trimmed mean: drop bottom 15% and top 15% of pixels
-                # by brightness, then take the mean of the remaining 70%.
-                # This preserves color balance (unlike per-channel percentile)
-                # while being robust to dark shadows and blown highlights.
-                _region_pix  = _rgb_fg[_mask].astype(np.float32)
-                _brightness  = _region_pix.mean(axis=1)
-                _lo, _hi     = np.percentile(_brightness, [15, 85])
-                _in_range    = (_brightness >= _lo) & (_brightness <= _hi)
-                if _in_range.sum() < 10:
-                    _in_range = np.ones(len(_region_pix), dtype=bool)
-                _col = _region_pix[_in_range].mean(axis=0)
+                    seg_regions.append(None); continue
+                _pix  = _rgb_fg[_mask]
+                _bri  = _pix.mean(axis=1)
+                _lo, _hi = np.percentile(_bri, [15, 85])
+                _ok   = (_bri >= _lo) & (_bri <= _hi)
+                _col  = _pix[_ok if _ok.sum() >= 10 else np.ones(len(_pix), bool)].mean(axis=0)
                 seg_regions.append({"color": _col, "pct": _pct})
-
-            _red_regions = [
-                (i, r) for i, r in enumerate(seg_regions)
-                if r is not None
-                and r["color"][0] > 90
-                and r["color"][0] > r["color"][1] * 1.3
-            ]
-            if _red_regions:
-                _body_idx, _body_region = max(_red_regions, key=lambda item: item[1]["pct"])
-                _body_color = _body_region["color"].copy()
-                for _ci, _r in enumerate(seg_regions):
-                    if _r is None or _ci == _body_idx:
-                        continue
-                    _c = _r["color"]
-                    # Merge into body red ONLY when this region is a genuine
-                    # washed-out red (highlight/specular on red body).
-                    # NOT for beige/tan/cream/orange which are distinct colors.
-                    # Key discriminator: G/B ratio.
-                    #   Red highlight [230,120,110]: G/B=1.09 (G and B both low)
-                    #   Beige/tan [230,190,160]:     G/B=1.19 (warm neutral, G>B)
-                    #   Orange [230,140,60]:         G/B=2.33 (very warm)
-                    _gb_ratio = float(_c[1]) / max(1.0, float(_c[2]))
-                    _red_tinted_highlight = (
-                        _c[0] > 170
-                        and _c[0] > _c[1] * 1.30   # clear red dominance
-                        and _gb_ratio < 1.10        # G and B close = red hue, not warm
-                    )
-                    if _red_tinted_highlight:
-                        _r["color"] = _body_color
-                        _r["merged_to"] = int(_body_idx)
-
-            _nreg = sum(1 for r in seg_regions if r is not None)
-            logger.info("  Photo segmented into %d color regions", _nreg)
-            for _ci, _r in enumerate(seg_regions):
-                if _r is None: continue
-                _c = _r["color"].astype(int)
-                _is_g = (_c[1] > _c[0]) and (_c[1] > _c[2])
-                _is_r = (_c[0] > _c[1] * 1.3) and (_c[0] > 80)
-                _tag  = " LEAF/GREEN" if _is_g else (" BODY/RED" if _is_r else "")
-                if "merged_to" in _r:
-                    _tag += f" MERGED->{_r['merged_to']}"
-                logger.info("    region %d: %.1f%%  RGB=[%d,%d,%d]%s",
-                            _ci, _r["pct"], int(_c[0]), int(_c[1]), int(_c[2]), _tag)
-        except Exception as _se:
-            logger.warning("  Photo segmentation failed: %s", _se)
+            logger.info("  k-means fallback: %d color regions",
+                        sum(1 for r in seg_regions if r is not None))
+        except Exception as _ke:
+            logger.warning("  k-means fallback also failed: %s", _ke)
             seg_regions = None
             seg_label_img = None
 
@@ -1397,63 +1475,115 @@ def paint_colors(mesh, views, base_colors=None, triposr_glb_path=None):
         if not len(sel):
             continue
 
-        # Weight: cos_nv * center_proximity
-        # Front view gets much higher weight so it establishes region colors.
+        # ── Per-vertex confidence weight ───────────────────────────────────
+        # w = cos_nv * center_proximity * depth_confidence * view_scale
+        #
+        # cos_nv       — surface facing the camera (0 = grazing, 1 = head-on)
+        # center_proximity — penalise pixels near image edges (distortion)
+        # depth_confidence — vertices closer to camera get higher weight;
+        #                    far vertices are more occluded/distorted
+        # view_scale   — per-view reliability factor derived from:
+        #                  - known vs unknown pose
+        #                  - elevation angle (high el = foreshortening)
+        #                  - how well this view already agrees with accumulated
+
         cos_w = np.clip(cos_nv[sel], 0.05, 1.0)
-        cx = ui[sel] - S / 2.0;  cy = vi[sel] - S / 2.0
-        ctr_w = 1.0 - 0.2 * (np.hypot(cx, cy) / (S / 2.0)).clip(0, 1)
+        # cos² sharpens the weighting: vertices squarely facing the cam get
+        # much more weight than grazing vertices (cos 0.2 → 0.04 vs cos 0.9 → 0.81)
+        cos_w = cos_w ** 2
+
+        px_cx = ui[sel] - S / 2.0
+        px_cy = vi[sel] - S / 2.0
+        ctr_w = 1.0 - 0.35 * (np.hypot(px_cx, px_cy) / (S / 2.0)).clip(0, 1)
+
+        # Depth confidence: normalise depth to [0,1] within this view's
+        # visible range and invert (nearer = more confident).
+        d_sel = depth[sel]
+        d_min, d_max = d_sel.min(), d_sel.max()
+        if d_max > d_min + 1e-6:
+            depth_conf = 1.0 - 0.4 * ((d_sel - d_min) / (d_max - d_min))
+        else:
+            depth_conf = np.ones(len(sel), dtype=np.float32)
+
+        # Saturation weight: chromatic pixels are more reliable than near-grey
+        _smax_v  = sampled.max(axis=1).clip(1, 255)
+        _smin_v  = sampled.min(axis=1)
+        _sat_v   = (_smax_v - _smin_v) / _smax_v
+        sat_w    = np.clip(_sat_v * 2.5 + 0.4, 0.4, 2.5)
 
         if is_front:
-            # Primary generated view: high base weight + saturation boost.
-            _smax  = sampled.max(axis=1).clip(1, 255)
-            _smin2 = sampled.min(axis=1)
-            _sat   = (_smax - _smin2) / _smax
-            sat_w  = np.clip(_sat * 3.0, 0.5, 3.0)
-            w      = cos_w * ctr_w * sat_w * 3.0
+            # Primary calibrated view (az=30, el=+20): highest base trust.
+            # Elevation 20° is mild — minimal foreshortening penalty.
+            el_penalty = 1.0 - abs(v["el"]) / 90.0 * 0.3   # ~0.93 at el=20
+            view_scale = 2.5 * el_penalty
+            w = cos_w * ctr_w * depth_conf * sat_w * view_scale
+
         elif is_input_photo:
-            # Input photo: pose unknown, use only for global color calibration.
-            # Very low weight so it doesn't override calibrated generated views.
-            _smax  = sampled.max(axis=1).clip(1, 255)
-            _smin2 = sampled.min(axis=1)
-            _sat   = (_smax - _smin2) / _smax
-            sat_w  = np.clip(_sat * 2.0, 0.1, 2.0)
-            w      = cos_w * ctr_w * sat_w * 0.3   # low weight, pose unknown
+            # Input photo: pose is estimated (not exact), use only to fill
+            # areas completely missed by all generated views.
+            # Weight is low but NOT zero — helps fill back/bottom surfaces.
+            _cur_w = accum_w[sel]
+            # Even lower weight on already-painted vertices
+            _paint_scale = np.where(_cur_w > 0.5, 0.08, 0.25)
+            view_scale = _paint_scale
+            w = cos_w * ctr_w * depth_conf * sat_w * view_scale
+
         else:
-            # Side generated views: color-lock + hue-conflict rejection.
-            # Vertices already painted by the front view get very low weight.
-            # Additionally, if the side-view sample is a DIFFERENT hue from
-            # the current accumulated color (e.g. teal vs pink), reject it
-            # entirely -- this prevents the hat/horn teal bleeding onto the body.
+            # Side generated views (6 views at known poses).
+            # Scale by elevation: high-elevation views have more foreshortening.
+            el_abs     = abs(v["el"])
+            el_penalty = 1.0 - el_abs / 90.0 * 0.5   # 0.94 at 10°, 0.72 at 45°
+
             _cur_w = accum_w[sel]
             _already_painted = _cur_w > 1.0
-            _side_scale = np.where(_already_painted, 0.10, 0.4)
 
-            # Hue-conflict guard: compare sampled hue to current accumulated color
+            # Multi-view agreement: if this view's color agrees with current
+            # accumulated color, give it full weight; disagreement → reduce.
             _cur_col = (accum_col[sel] / _cur_w[:, None].clip(1e-6)).astype(np.float32)
-            # Only apply when vertex has meaningful accumulated color
-            _has_color = _cur_w > 0.3
-            if _has_color.any():
-                def _hue_f32(rgb):
-                    r,g,b = rgb[:,0]/255.0, rgb[:,1]/255.0, rgb[:,2]/255.0
-                    cmax = np.maximum(np.maximum(r,g),b)
-                    cmin = np.minimum(np.minimum(r,g),b)
-                    d = cmax - cmin
-                    h = np.zeros(len(rgb), np.float32)
-                    mr = (d>0.01)&(cmax==r); h[mr]=30.0*((g[mr]-b[mr])/d[mr]%6.0)
-                    mg = (d>0.01)&(cmax==g); h[mg]=30.0*((b[mg]-r[mg])/d[mg]+2.0)
-                    mb = (d>0.01)&(cmax==b); h[mb]=30.0*((r[mb]-g[mb])/d[mb]+4.0)
-                    h[d<=0.01] = -1.0
-                    return h
-                _h_samp = _hue_f32(sampled)
-                _h_cur  = _hue_f32(_cur_col)
-                _both_chr = (_h_samp >= 0) & (_h_cur >= 0) & _has_color
-                _hdiff = np.abs(_h_samp - _h_cur)
-                _hdiff = np.minimum(_hdiff, 180.0 - _hdiff)
-                # Zero out weight for hue-conflicting samples on painted verts
-                _hue_conflict = _both_chr & (_hdiff > 35.0) & _already_painted
-                _side_scale = np.where(_hue_conflict, 0.0, _side_scale)
+            _has_acc = _cur_w > 0.3
 
-            w = cos_w * ctr_w * _side_scale
+            # Compute per-vertex Lab-space ΔE between sampled and accumulated
+            # (approximated cheaply as normalised RGB distance)
+            _rgb_diff = np.linalg.norm(
+                sampled.astype(np.float32) - _cur_col.astype(np.float32), axis=1
+            ) / 255.0   # 0 = identical, 1 = max distance
+
+            # agreement_w: 1.0 when colours agree, drops to 0.1 at ΔE=0.5+
+            agreement_w = np.where(
+                _has_acc,
+                np.clip(1.0 - _rgb_diff * 1.8, 0.1, 1.0),
+                np.ones(len(sel), dtype=np.float32),
+            )
+
+            # Hue-conflict guard — hard reject large hue swings on
+            # already-painted vertices (prevents teal hat bleeding onto body)
+            def _hue_f32(rgb):
+                r,g,b = rgb[:,0]/255.0, rgb[:,1]/255.0, rgb[:,2]/255.0
+                cmax = np.maximum(np.maximum(r,g),b)
+                cmin = np.minimum(np.minimum(r,g),b)
+                d = cmax - cmin
+                h = np.zeros(len(rgb), np.float32)
+                mr = (d>0.01)&(cmax==r); h[mr]=30.0*((g[mr]-b[mr])/d[mr]%6.0)
+                mg = (d>0.01)&(cmax==g); h[mg]=30.0*((b[mg]-r[mg])/d[mg]+2.0)
+                mb = (d>0.01)&(cmax==b); h[mb]=30.0*((r[mb]-g[mb])/d[mb]+4.0)
+                h[d<=0.01] = -1.0
+                return h
+
+            _h_samp = _hue_f32(sampled)
+            _h_cur  = _hue_f32(_cur_col)
+            _both_chr  = (_h_samp >= 0) & (_h_cur >= 0) & _has_acc
+            _hdiff     = np.abs(_h_samp - _h_cur)
+            _hdiff     = np.minimum(_hdiff, 180.0 - _hdiff)
+            # Hard-zero weight for strong hue conflict (>40°) on painted verts
+            _hue_ok    = ~(_both_chr & (_hdiff > 40.0) & _already_painted)
+
+            # Base scale: unpainted vertices get full side-view weight;
+            # already-painted get reduced weight so front view dominates.
+            base_scale = np.where(_already_painted, 0.25, 0.7)
+
+            w = (cos_w * ctr_w * depth_conf * sat_w
+                 * base_scale * el_penalty * agreement_w
+                 * _hue_ok.astype(np.float32))
 
         accum_col[sel] += sampled * w[:, None]
         accum_w[sel]   += w
@@ -1783,61 +1913,202 @@ def cleanup(mesh, target_faces=None, smooth=True, keep_largest=True):
     return mesh
 
 
-def _auto_orient(mesh):
+def _make_24_rotations():
     """
-    Rotate the mesh so the tallest bounding-box dimension aligns with Y (up).
-    This fixes TripoSR meshes that arrive with X as the longest axis.
+    Return the 24 rotation matrices that form the rotation group of a cube
+    (all 90°-multiple rotations that map axis-aligned unit vectors to
+    axis-aligned unit vectors).  These are ALL possible orientations a mesh
+    can have when TripoSR / InstantMesh emits it in an arbitrary canonical
+    frame.  Trying all 24 guarantees we find the correct one regardless of
+    the original mesh orientation.
+    """
+    rots = []
+    def Rx(a): c,s=np.cos(a),np.sin(a); return np.array([[1,0,0],[0,c,-s],[0,s,c]])
+    def Ry(a): c,s=np.cos(a),np.sin(a); return np.array([[c,0,s],[0,1,0],[-s,0,c]])
+    def Rz(a): c,s=np.cos(a),np.sin(a); return np.array([[c,-s,0],[s,c,0],[0,0,1]])
+    for ax in [0, np.pi/2, np.pi, 3*np.pi/2]:
+        for ay in [0, np.pi/2, np.pi, 3*np.pi/2]:
+            for az in [0, np.pi/2]:
+                R = Rx(ax) @ Ry(ay) @ Rz(az)
+                # Only keep proper rotations (det=+1) — 24 out of 64 combos
+                if abs(np.linalg.det(R) - 1.0) < 1e-6:
+                    # Deduplicate: skip if already in list
+                    dup = any(np.allclose(R, r, atol=1e-6) for r in rots)
+                    if not dup:
+                        rots.append(R)
+    return rots
 
-    Skipped if _apply_pose_orientation already ran successfully — the pose
-    estimator gives a more accurate orientation than the bounding-box
-    heuristic and they must not fight each other.
+
+# Pre-built once at import time — 24 rotation matrices
+_CANONICAL_ROTATIONS = _make_24_rotations()
+
+
+def _silhouette_iou_fast(verts_norm, views, max_views=4):
+    """
+    Fast silhouette IoU for orientation search.
+    Uses a decimated vertex set (every 8th vertex) to keep the 24×N search
+    tractable.  Returns mean IoU across accepted views.
+
+    verts_norm: (N,3) float32 already normalized to [-0.5, 0.5]
+    """
+    S   = IMG_SIZE
+    iou_sum = 0.0
+    n_views = 0
+    for v in views[1:max_views+1]:          # skip input photo (view 0, pose unknown)
+        mask = _get_mask(v)
+        if mask is None or mask.mean() < 0.02:
+            continue
+        mask_rs = np.array(
+            Image.fromarray(mask.astype(np.uint8) * 255).resize((S, S), Image.NEAREST)
+        ) > 127
+        u, vpx, depth, valid = _project(verts_norm, v["az"], v["el"])
+        front = valid & (depth > 0)
+        if not front.any():
+            continue
+        ui = np.clip(np.round(u[front]).astype(np.int32),  0, S - 1)
+        vi = np.clip(np.round(vpx[front]).astype(np.int32), 0, S - 1)
+        sil = np.zeros((S, S), dtype=bool)
+        sil[vi, ui] = True
+        from scipy.ndimage import binary_dilation
+        sil = binary_dilation(sil, iterations=4)
+        inter = float((sil & mask_rs).sum())
+        union = float((sil | mask_rs).sum())
+        if union > 0:
+            iou_sum += inter / union
+            n_views  += 1
+    return iou_sum / n_views if n_views > 0 else 0.0
+
+
+def _find_best_orientation(mesh, views):
+    """
+    Try all 24 axis-aligned canonical rotations and return the rotation R
+    that maximises the mean silhouette IoU against the known-pose views.
+
+    Why 24?  TripoSR/InstantMesh can emit the mesh in ANY of the 24 orientations
+    of a cube — 0°, 90°, 180°, or 270° around each of the three axes.
+    A heuristic (bounding-box spread, symmetry ratio) will fail on objects
+    that don't match its assumptions.  Silhouette IoU is shape-agnostic: it
+    directly measures whether the mesh silhouette matches the input photos,
+    which is exactly what we want.
+
+    Cost: 24 projections × ~N/8 vertices × 4 views ≈ very fast (CPU, <0.5 s).
+
+    Returns: best_R (3×3), best_iou (float)
+    """
+    verts = np.asarray(mesh.vertices, dtype=np.float32).copy()
+    # Normalize to unit sphere for projection
+    centre = verts.mean(axis=0)
+    verts -= centre
+    scale  = np.abs(verts).max()
+    if scale > 1e-6:
+        verts /= scale
+    # Decimate: every 8th vertex to keep search fast
+    stride  = max(1, len(verts) // 2000)
+    v_small = verts[::stride]
+
+    best_iou = -1.0
+    best_R   = np.eye(3)
+    scores   = []
+
+    for R in _CANONICAL_ROTATIONS:
+        v_rot = (R @ v_small.T).T
+        iou   = _silhouette_iou_fast(v_rot, views)
+        scores.append(iou)
+        if iou > best_iou:
+            best_iou = iou
+            best_R   = R
+
+    scores_sorted = sorted(scores, reverse=True)
+    logger.info(
+        "  Orientation search: best_iou=%.3f  2nd=%.3f  worst=%.3f  (24 rotations tested)",
+        scores_sorted[0],
+        scores_sorted[1] if len(scores_sorted) > 1 else 0.0,
+        scores_sorted[-1],
+    )
+    return best_R, best_iou
+
+
+def _auto_orient(mesh, views=None):
+    """
+    Find the correct mesh orientation by trying all 24 canonical rotations
+    and selecting the one whose silhouette best matches the known-pose views.
+
+    This replaces the old bounding-box / spread-ratio heuristic which failed
+    on objects that don't match its shape assumptions (wide-top objects,
+    flat objects, asymmetric objects, etc.).
+
+    If views are not available (fallback path), uses the old bounding-box
+    heuristic as a last resort.
+
+    Skipped if _apply_pose_orientation already ran successfully.
     """
     # Pose estimator already handled orientation — don't override it.
     if mesh.metadata.get("pose_estimator_applied"):
         logger.info("  Auto-orient skipped: pose estimator already applied")
         return mesh
 
+    # ── IoU-based canonical orientation search ─────────────────────────────
+    if views is not None and len(views) >= 2:
+        try:
+            best_R, best_iou = _find_best_orientation(mesh, views)
+
+            if best_iou < 0.05:
+                logger.warning(
+                    "  Auto-orient: best IoU=%.3f is very low — "
+                    "silhouette search unreliable, falling back to bbox heuristic",
+                    best_iou,
+                )
+                # Fall through to bbox heuristic below
+            else:
+                # Apply the best rotation
+                centre = (mesh.bounds[0] + mesh.bounds[1]) / 2.0
+                mesh.vertices -= centre
+                mesh.vertices  = (best_R @ mesh.vertices.T).T
+                centre2 = (mesh.bounds[0] + mesh.bounds[1]) / 2.0
+                mesh.vertices -= centre2
+                if hasattr(mesh, "fix_normals"):
+                    mesh.fix_normals()
+                mesh.metadata["auto_orient_iou"] = float(best_iou)
+                logger.info(
+                    "  Auto-orient: applied best canonical rotation (IoU=%.3f)", best_iou
+                )
+                return mesh
+        except Exception as exc:
+            logger.warning("  Auto-orient IoU search failed: %s — falling back to bbox", exc)
+
+    # ── Fallback: bounding-box heuristic ──────────────────────────────────
+    # Used when views are not available or IoU search produced very low scores.
     bb  = mesh.bounds
     ext = bb[1] - bb[0]
 
-    # Y is already the tallest — no rotation needed
-    if np.argmax(ext) == 1:
-        return mesh
+    if np.argmax(ext) != 1:
+        tall_idx = int(np.argmax(ext))
+        src_axis = np.zeros(3); src_axis[tall_idx] = 1.0
+        world_y  = np.array([0., 1., 0.])
+        v_cross  = np.cross(src_axis, world_y)
+        s        = float(np.linalg.norm(v_cross))
+        c        = float(np.dot(src_axis, world_y))
 
-    # Rotate so the tallest dimension becomes Y
-    tall_idx = int(np.argmax(ext))  # 0=X, 1=Y, 2=Z
-    # We want tall_idx axis to map to world Y
-    src_axis = np.zeros(3); src_axis[tall_idx] = 1.0
-    # Make it point in the positive Y direction
-    world_y  = np.array([0., 1., 0.])
-    v_cross  = np.cross(src_axis, world_y)
-    s        = float(np.linalg.norm(v_cross))
-    c        = float(np.dot(src_axis, world_y))
+        if s < 1e-6:
+            if c < 0:
+                mesh.vertices[:, 1] *= -1
+                mesh.vertices[:, 2] *= -1
+        else:
+            Kmat = np.array([[0, -v_cross[2], v_cross[1]],
+                             [v_cross[2], 0, -v_cross[0]],
+                             [-v_cross[1], v_cross[0], 0]])
+            R = np.eye(3) + Kmat + Kmat @ Kmat * ((1 - c) / (s * s + 1e-12))
+            mesh.vertices = (R @ mesh.vertices.T).T
 
-    if s < 1e-6:
-        # Already aligned or anti-aligned
-        if c < 0:
-            # 180 degree flip — rotate around X
-            mesh.vertices[:, 1] *= -1
-            mesh.vertices[:, 2] *= -1
-        return mesh
+        c2 = (mesh.bounds[0] + mesh.bounds[1]) / 2.0
+        mesh.vertices -= c2
+        if hasattr(mesh, "fix_normals"):
+            mesh.fix_normals()
+        b = mesh.bounds
+        logger.info("  Auto-orient bbox fallback: tall axis was %s → Y. "
+                    "bbox X=%.2f Y=%.2f Z=%.2f",
+                    ["X","Y","Z"][tall_idx], b[1,0]-b[0,0], b[1,1]-b[0,1], b[1,2]-b[0,2])
 
-    Kmat = np.array([[0, -v_cross[2], v_cross[1]],
-                     [v_cross[2], 0, -v_cross[0]],
-                     [-v_cross[1], v_cross[0], 0]])
-    R = np.eye(3) + Kmat + Kmat @ Kmat * ((1 - c) / (s * s + 1e-12))
-    mesh.vertices = (R @ mesh.vertices.T).T
-
-    # Re-center after rotation
-    c2 = (mesh.bounds[0] + mesh.bounds[1]) / 2.0
-    mesh.vertices -= c2
-
-    if hasattr(mesh, "fix_normals"):
-        mesh.fix_normals()
-
-    b = mesh.bounds
-    logger.info("  Auto-orient: tall axis was %s, now Y. bbox X=%.2f Y=%.2f Z=%.2f",
-                ["X","Y","Z"][tall_idx], b[1,0]-b[0,0], b[1,1]-b[0,1], b[1,2]-b[0,2])
     return mesh
 
 
@@ -2020,9 +2291,9 @@ def _apply_target_dimensions(mesh, target_dimensions_mm=None):
     return mesh, dims
 
 
-def _orient_and_normalize(mesh, out_dir: str | None = None, target_dimensions_mm=None):
+def _orient_and_normalize(mesh, out_dir: str | None = None, target_dimensions_mm=None, views=None):
     mesh = _apply_pose_orientation(mesh, out_dir)
-    mesh = _auto_orient(mesh)
+    mesh = _auto_orient(mesh, views=views)
     centre = (mesh.bounds[0] + mesh.bounds[1]) / 2.0
     mesh.vertices -= centre
     scale = np.max(mesh.bounds[1] - mesh.bounds[0])
@@ -2443,7 +2714,7 @@ def reconstruct_from_dir(out_dir: str, backend: str = "auto", cancel_event=None,
 
     # Align before camera-space operations. TripoSR often emits X-up meshes,
     # while the photo/view projection assumes Y-up.
-    mesh = _orient_and_normalize(mesh, out_dir, target_dimensions_mm)
+    mesh = _orient_and_normalize(mesh, out_dir, target_dimensions_mm, views=views)
     validate_mesh_topology(mesh, "B2-after-orientation")
 
     # ── Silhouette IoU quality gate ───────────────────────────────────────

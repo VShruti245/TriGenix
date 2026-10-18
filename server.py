@@ -153,7 +153,7 @@ def _run_reconstruction(out_dir: str, user_id=None, cancel_event=None, notify_em
     queued_name = out_dir
     try:
         _enter_gpu_queue(queued_name)
-        _set_job(out_dir, "running", {}, queue_position=0)
+        _set_job(out_dir, "running", {}, queue_position=0, recon_started_at=_now())
         _write_job_log(out_dir, "queued -> running")
         try:
             from auth import upsert_job as _uj
@@ -595,9 +595,14 @@ class Handler(SimpleHTTPRequestHandler):
                     job = {"status": "done", "result": disk_result, "queue_position": 0}
                 else:
                     job = {"status": "running", "result": {}}
+            # Add elapsed_seconds so the frontend can show real time remaining
+            elapsed_sec = 0
+            if job.get("status") == "running" and job.get("recon_started_at"):
+                elapsed_sec = max(0, _now() - job["recon_started_at"])
             self._json({
                 "status": job["status"],
                 "queue_position": job.get("queue_position", job.get("result", {}).get("queue_position", 0)),
+                "elapsed_seconds": elapsed_sec,
                 **job["result"],
             })
             return
